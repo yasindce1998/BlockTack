@@ -1,0 +1,26 @@
+# Target for the naive-oracle-vault corpus fixture (BTV-L2-003).
+# The playbook boots anvil on 127.0.0.1:8545 and deploys this fixture
+# before attacking it.
+apiVersion: blocktack/v1
+name: naive-oracle-vault
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: anvil-rpc
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: NaiveOracleVault
+    address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" # deterministic when deployed by playbook
+    sourceDir: corpus/fixtures/naive-oracle-vault
+components:
+  - name: MockPriceFeed
+    kind: oracle
+    note: manipulable Chainlink-style stub backing the vault
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet fixture only
+  expires: "2027-12-31T00:00:00Z"

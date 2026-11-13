@@ -26,6 +26,7 @@ func Registry() map[string]Adapter {
 	dir := adaptersDir()
 	return map[string]Adapter{
 		"slither": {Name: "slither", Script: filepath.Join(dir, "slither_adapter.py")},
+		"foundry": {Name: "foundry", Script: filepath.Join(dir, "foundry_adapter.py")},
 	}
 }
 

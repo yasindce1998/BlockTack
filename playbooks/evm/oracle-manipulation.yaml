@@ -17,8 +17,11 @@ steps:
     tactic: setup
     run:
       type: shell
-      command: anvil
-      args: ["--fork-url", "${FORK_URL:-http://127.0.0.1:8545}", "--port", "8545"]
+      command: sh
+      args:
+        - "-c"
+        - |
+          anvil --fork-url "${FORK_URL:-http://127.0.0.1:8545}" --port 8545
       background: true
 
   - id: map-oracles

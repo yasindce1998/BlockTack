@@ -14,17 +14,23 @@
 - [x] Adapter bridge (Python/SARIF) with Slither as the first adapter
 - [x] Playbook schema + campaign runner with artifacts
 - [x] Rust engine stub proving the job/findings pipeline
-- [ ] Foundry adapter (forge test / invariant harness auto-generation)
+- [x] Foundry adapter (forge build/test; passing `test_poc_*` = confirmed finding)
 - [ ] Echidna/Medusa adapter (property-based fuzzing)
-- [ ] Wire Damn Vulnerable DeFi as the first corpus replay
+- [x] Wire a corpus fixture replay end to end (`corpus/fixtures/naive-oracle-vault`)
 
-## Phase 2 — Adversarial execution environment
+## Phase 2 — Adversarial execution environment (in progress)
 
-- [ ] revm/alloy integration in `engine-evm`: fork state manipulation,
-      block-level simulation, state overrides
-- [ ] Implement real `map-oracles`, `oracle-skew`, `verify-pnl` actions
+- [x] alloy integration in `engine-evm` with three real actions:
+      `fingerprint` (chain identity), `map-oracles` (bytecode selector
+      scan for oracle dependencies, keccak-verified selectors),
+      `verify-pnl` (balance-delta profit verification)
+- [x] First end-to-end campaign: boot anvil → deploy fixture → map
+      oracles from bytecode → execute price-skew attack on-chain via
+      cast → verify attacker profit → cross-check with forge PoC
+      (`playbooks/evm/naive-oracle-vault.yaml`)
+- [ ] revm integration: state overrides and block-level simulation for
+      attacks that must not touch even a local chain
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
-- [ ] Attack verification: every critical finding carries a replayable PoC
 - [ ] Corpus goal: reproduce 5 historical exploits end to end
 
 ## Phase 3 — L0/L1 node and consensus attacks
