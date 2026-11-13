@@ -383,6 +383,122 @@ pub async fn simulate_call(
     }
 }
 
+/// oracle-staleness: call `latestRoundData()` on each feed and compare
+/// `updatedAt` against the latest block timestamp. Feeds that stopped
+/// updating are the quiet version of oracle compromise (BTV-L4-001).
+///
+/// options:
+///   feeds:                list of aggregator addresses
+///   maxStalenessSeconds:  staleness threshold (default 3600)
+pub async fn oracle_staleness(
+    rpc_url: &str,
+    feeds: &[String],
+    max_staleness: u64,
+) -> anyhow::Result<Vec<Finding>> {
+    let provider = connect(rpc_url).await?;
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("latest block not found"))?;
+    let block_ts = block.header.timestamp;
+
+    let mut findings = Vec::new();
+    for raw in feeds {
+        let Ok(address) = raw.parse::<Address>() else {
+            continue;
+        };
+        // calldata = selector("latestRoundData()") — no arguments.
+        let calldata = selector("latestRoundData()").to_vec();
+        let mut tx = TransactionRequest::default();
+        tx.set_to(address);
+        tx.set_input(Bytes::from(calldata));
+
+        let result: Result<Bytes, _> = provider.call(tx).await;
+        let Ok(res) = result else {
+            findings.push(
+                Finding::new(
+                    "engine-evm-oracle-staleness",
+                    format!("Feed does not implement latestRoundData(): {raw}"),
+                    "info",
+                )
+                .with("layer", "L4")
+                .with("description", "eth_call to latestRoundData() reverted; the feed uses another interface (e.g. legacy latestAnswer).")
+                .with("target", raw.clone()),
+            );
+            continue;
+        };
+        if res.len() < 160 {
+            findings.push(
+                Finding::new(
+                    "engine-evm-oracle-staleness",
+                    format!("Unexpected latestRoundData() return size from {raw}"),
+                    "low",
+                )
+                .with("layer", "L4")
+                .with("evidence", format!("return_size={}", res.len()))
+                .with("target", raw.clone()),
+            );
+            continue;
+        }
+
+        // latestRoundData() returns (roundId, answer, startedAt, updatedAt,
+        // answeredInRound) — 5 x 32-byte words.
+        let answer = U256::from_be_bytes::<32>(res[32..64].try_into().unwrap());
+        let updated_at = U256::from_be_bytes::<32>(res[96..128].try_into().unwrap());
+        let evidence = format!(
+            "feed={raw} answer={answer} updatedAt={updated_at} blockTimestamp={block_ts}"
+        );
+
+        if answer.is_zero() {
+            findings.push(
+                Finding::new("engine-evm-oracle-staleness", "Oracle feed reporting zero", "critical")
+                    .with("confidence", "confirmed")
+                    .with("layer", "L4")
+                    .with("weakness", "BTV-L4-001")
+                    .with(
+                        "description",
+                        "The aggregator's latest answer is zero — consuming protocols will \
+                         misprice assets or break outright (the classic broken-feed incident).",
+                    )
+                    .with("evidence", evidence),
+            );
+            continue;
+        }
+
+        let staleness = block_ts.saturating_sub(updated_at.to::<u64>());
+        if staleness > max_staleness {
+            findings.push(
+                Finding::new(
+                    "engine-evm-oracle-staleness",
+                    format!("Stale oracle feed: last update {staleness}s ago (threshold {max_staleness}s)"),
+                    "high",
+                )
+                .with("confidence", "confirmed")
+                .with("layer", "L4")
+                .with("weakness", "BTV-L4-001")
+                .with(
+                    "description",
+                    "The feed stopped updating. Protocols consuming it act on stale prices — \
+                     a quiet failure mode that precedes many oracle incidents.",
+                )
+                .with("evidence", evidence),
+            );
+        } else {
+            findings.push(
+                Finding::new(
+                    "engine-evm-oracle-staleness",
+                    format!("Oracle feed fresh (staleness {staleness}s)"),
+                    "info",
+                )
+                .with("confidence", "confirmed")
+                .with("layer", "L4")
+                .with("evidence", evidence),
+            );
+        }
+    }
+    Ok(findings)
+}
+
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

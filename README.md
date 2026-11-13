@@ -54,6 +54,9 @@ bin/blocktack recon --target examples/targets/local-anvil.yaml --out /tmp/findin
 # Node-layer audit (client CVEs, RPC fuzzing, mempool, peer topology):
 bin/blocktack node-audit --target examples/targets/local-anvil.yaml
 
+# Off-chain web audit (headers, listings, exposed secrets):
+bin/blocktack node-audit --target corpus/fixtures/off-chain-api/target.yaml --module web-audit
+
 # Run an attack playbook (campaign output lands in runs/campaigns/):
 bin/blocktack campaign \
   --target examples/targets/mainnet-fork.yaml \

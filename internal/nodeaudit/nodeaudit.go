@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/webaudit"
 )
 
 // Modules returns the available audit module names.
@@ -50,8 +51,10 @@ func runModule(ctx context.Context, module string, tgt *core.Target) ([]core.Fin
 		return mempoolAnalysis(ctx, tgt)
 	case "peer-analysis":
 		return peerAnalysis(ctx, tgt)
+	case "web-audit":
+		return webaudit.Run(ctx, tgt)
 	default:
-		return nil, fmt.Errorf("unknown module %q (available: %v, all)", module, Modules())
+		return nil, fmt.Errorf("unknown module %q (available: %v, web-audit, all)", module, Modules())
 	}
 }
 

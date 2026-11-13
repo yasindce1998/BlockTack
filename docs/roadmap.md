@@ -60,10 +60,17 @@
 
 ## Phase 4 — L3/L4 cross-chain and off-chain
 
-- [ ] Bridge model checkers (signature verification, replay domains)
-- [ ] Oracle manipulation campaigns beyond EVM (Pyth/Chainlink feeds)
-- [ ] Indexer/API attack surface (embed nuclei engine)
-- [ ] Frontend/key-management assessment modules
+- [x] Oracle freshness auditing: `oracle-staleness` engine action calls
+      `latestRoundData()` via eth_call and compares `updatedAt` against
+      the block timestamp — stale and zero-answer feeds are findings
+      (BTV-L4-001); replayable via `playbooks/evm/stale-oracle.yaml`
+- [x] Off-chain web attack surface: `web-audit` module (plaintext HTTP,
+      missing hardening headers, directory listings, committed `.env`/
+      `.git`/pprof/GraphQL exposure) against api/indexer/frontend
+      endpoints (BTV-L4-002/003); replayable via
+      `playbooks/evm/off-chain-attack-surface.yaml`- [ ] Bridge model checkers (signature verification, replay domains)
+- [ ] Relayer/light-client misconfiguration modules
+- [ ] Cross-chain message replay campaigns on multi-chain sandboxes
 
 ## Phase 5 — Correlation + reporting
 

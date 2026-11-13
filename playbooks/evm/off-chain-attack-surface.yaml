@@ -1,0 +1,61 @@
+# Off-chain attack-surface audit (L4): plaintext HTTP, missing security
+# headers, directory listings, and committed secrets in the web root.
+# Runs against a local file-server fixture that exhibits all of them.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/fixtures/off-chain-api/target.yaml \
+#     --playbook playbooks/evm/off-chain-attack-surface.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: off-chain-attack-surface
+description: >
+  Audits off-chain components (indexer/web APIs, frontends) for
+  exposure: plaintext transport, missing hardening headers, directory
+  listings, and secrets committed to the web root (BTV-L4-002/003).
+target:
+  chainTypes: [evm]
+  layers: [L4]
+steps:
+  - id: env-up
+    name: Start the fixture web server
+    tactic: setup
+    run:
+      type: shell
+      command: python3
+      args:
+        - "-m"
+        - "http.server"
+        - "8787"
+        - "--directory"
+        - "corpus/fixtures/off-chain-api/public"
+      background: true
+
+  - id: wait-for-http
+    name: Wait for the web server to answer
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 50); do
+            curl -sf http://127.0.0.1:8787/ >/dev/null 2>&1 && exit 0
+            sleep 0.2
+          done
+          echo "web server did not come up" >&2
+          exit 1
+
+  - id: web-audit
+    name: Audit the off-chain endpoint
+    tactic: discover
+    run:
+      type: builtin
+      action: web-audit
+
+verification:
+  - id: secrets-exposed
+    expects: web-audit reports the committed .env at high severity
+  - id: dirlist
+    expects: web-audit reports the directory listing

@@ -122,6 +122,30 @@ async fn dispatch(job: Job) -> Vec<Finding> {
         }
         .await,
         "simulate-call" => actions::simulate_call(&url, &job.options).await,
+        "oracle-staleness" => {
+            let feeds: Vec<String> = job
+                .options
+                .get("feeds")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .unwrap_or_else(|| {
+                    job.target
+                        .contracts
+                        .iter()
+                        .filter_map(|c| c.address.clone())
+                        .collect()
+                });
+            let max_staleness = job
+                .options
+                .get("maxStalenessSeconds")
+                .and_then(Value::as_u64)
+                .unwrap_or(3600);
+            async {
+                let provider = actions::connect(&url).await?;
+                actions::oracle_staleness(&url, &feeds, max_staleness).await
+            }
+            .await
+        }
         "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {            Some(attacker) => {
                 let blocks_ago = job
                     .options
