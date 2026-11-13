@@ -29,6 +29,9 @@ type Weakness struct {
 	ID          string   `yaml:"id"`
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
+	// Remediation is concrete fix guidance rendered in engagement
+	// reports. It is advisory prose, not machine-actionable.
+	Remediation string   `yaml:"remediation"`
 	Tags        []string `yaml:"tags"`
 }
 
