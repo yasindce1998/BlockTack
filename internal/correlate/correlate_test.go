@@ -122,6 +122,34 @@ func TestCredentialExposureChain(t *testing.T) {
 	}
 }
 
+func TestDamnVulnerableDeFiPoCChain(t *testing.T) {
+	// Shape of the DvD campaign findings: the passing PoC carries the
+	// weakness itself (no separate simulation/profit findings).
+	findings := []core.Finding{
+		{ID: "foundry-poc-test/puppet-v2/PuppetV2.t.sol-PuppetV2Challenge-test_poc_puppetV2()",
+			Title: "PoC passed: test_poc_puppetV2()", Severity: core.SevCritical,
+			Layer: "L2", Weakness: "BTV-L2-003", Source: "foundry"},
+	}
+	chains := Analyze(findings)
+	found := false
+	for _, c := range chains {
+		if c.ID == "killchain-oracle-manipulation" {
+			found = true
+			if c.Severity != core.SevCritical {
+				t.Errorf("severity = %s, want critical (PoC passed)", c.Severity)
+			}
+			// The weakness stage and PoC stage reference the same
+			// finding; dedup must leave exactly one stage.
+			if len(c.Stages) != 1 {
+				t.Errorf("stages = %d, want 1 (deduped), got %+v", len(c.Stages), c.Stages)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected oracle kill chain from PoC finding, got %+v", chains)
+	}
+}
+
 func TestNoFalseChainsFromUnrelatedFindings(t *testing.T) {
 	findings := []core.Finding{
 		{ID: "recon-client-fingerprint", Title: "Node client fingerprinted", Severity: core.SevInfo, Layer: "L1"},

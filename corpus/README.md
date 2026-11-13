@@ -55,3 +55,24 @@ bin/blocktack campaign \
   --target corpus/fixtures/reentrant-vault/target.yaml \
   --playbook playbooks/evm/reentrant-vault.yaml
 ```
+
+## Wargame corpus: Damn Vulnerable DeFi
+
+`corpus/damn-vulnerable-defi/` vendors (trimmed) three challenges from
+[Damn Vulnerable DeFi](https://damnvulnerabledefi.xyz) with solutions
+written as `test_poc_*` tests — the first entries with **real-world
+challenge provenance**, tracked in `manifest.yaml` under `wargames`:
+
+| Challenge    | Weakness    | Exploit                                            |
+|--------------|-------------|----------------------------------------------------|
+| side-entrance  | BTV-L2-001 | flash loan "repaid" via the pool's own deposit    |
+| naive-receiver | BTV-L2-002 | fee drain + `_msgSender()` forgery via delegatecall |
+| puppet-v2      | BTV-L2-003 | oracle crash by dumping tokens into the price pair |
+
+```sh
+bin/blocktack campaign \
+  --target corpus/damn-vulnerable-defi/target.yaml \
+  --playbook playbooks/evm/damn-vulnerable-defi.yaml
+```
+
+Three confirmed critical PoC findings and two composed kill chains.

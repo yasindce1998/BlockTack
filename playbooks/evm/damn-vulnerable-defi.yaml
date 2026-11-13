@@ -1,0 +1,38 @@
+# Damn Vulnerable DeFi corpus replay: executes the three vendored
+# challenge exploits (solutions written as test_poc_* in the vendored
+# repo) and correlates them into kill chains.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/damn-vulnerable-defi/target.yaml \
+#     --playbook playbooks/evm/damn-vulnerable-defi.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: damn-vulnerable-defi
+description: >
+  Executes the Damn Vulnerable DeFi corpus: three real-world-shaped
+  exploits (flash-loan balance accounting, forwarder sender forgery,
+  oracle price manipulation) reproduced as passing forge PoCs, each
+  mapped to its taxonomy weakness and correlated into a kill chain.
+target:
+  chainTypes: [evm]
+  layers: [L2]
+steps:
+  - id: forge-poc
+    name: Run the three challenge exploit PoCs
+    tactic: exploit
+    run:
+      type: adapter
+      adapter: foundry
+      options:
+        sourceDir: corpus/damn-vulnerable-defi
+        weaknessBySuite:
+          side-entrance: BTV-L2-001
+          naive-receiver: BTV-L2-002
+          puppet-v2: BTV-L2-003
+
+verification:
+  - id: three-pocs
+    expects: three confirmed critical findings — one per challenge
+  - id: kill-chains
+    expects: each PoC composes into a critical kill chain

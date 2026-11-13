@@ -9,8 +9,7 @@
 #   detected   — tooling flags the weakness class on the replayed target
 #   reproduced — a playbook executes the exploit end to end with verified PnL
 apiVersion: blocktack/corpus/v1
-exploits:
-  - id: ronin-bridge-2022
+exploits:  - id: ronin-bridge-2022
     title: Ronin Bridge validator key compromise
     year: 2022
     layers: [L3]
@@ -117,3 +116,32 @@ exploits:
     reference: https://rekt.news/cetus-rekt/
     status: pending
     notes: checked_math bypass in liquidity math; non-EVM target
+
+# Wargame corpus entries — real-world-shaped vulnerabilities from
+# https://damnvulnerabledefi.xyz, vendored (trimmed) under
+# corpus/damn-vulnerable-defi/ with solutions written as test_poc_*.
+# Replayed by playbooks/evm/damn-vulnerable-defi.yaml.
+wargames:
+  - id: dvd-side-entrance
+    title: Damn Vulnerable DeFi — Side Entrance
+    layers: [L2]
+    weakness: BTV-L2-001
+    reference: https://damnvulnerabledefi.xyz/challenges/side-entrance/
+    status: reproduced
+    notes: flash loan "repaid" via the pool's own deposit(); balance accounting flaw credits the attacker a withdrawable balance
+
+  - id: dvd-naive-receiver
+    title: Damn Vulnerable DeFi — Naive Receiver
+    layers: [L2]
+    weakness: BTV-L2-002
+    reference: https://damnvulnerabledefi.xyz/challenges/naive-receiver/
+    status: reproduced
+    notes: fixed flash-loan fee drains the receiver; _msgSender() trusts calldata suffixes so a delegatecall through Multicall forges the depositor and empties the pool
+
+  - id: dvd-puppet-v2
+    title: Damn Vulnerable DeFi — Puppet V2
+    layers: [L2, L5]
+    weakness: BTV-L2-003
+    reference: https://damnvulnerabledefi.xyz/challenges/puppet-v2/
+    status: reproduced
+    notes: lending pool prices collateral from Uniswap V2 spot reserves; dumping tokens crashes the oracle and the pool is borrowed for a fraction of its value
