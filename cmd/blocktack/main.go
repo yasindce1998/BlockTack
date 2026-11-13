@@ -13,6 +13,7 @@ import (
 
 	"github.com/blocktack/blocktack/internal/adapter"
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/nodeaudit"
 	"github.com/blocktack/blocktack/internal/playbook"
 	"github.com/blocktack/blocktack/internal/recon"
 	"github.com/blocktack/blocktack/internal/report"
@@ -37,6 +38,8 @@ func main() {
 		err = cmdScan(os.Args[2:])
 	case "campaign":
 		err = cmdCampaign(os.Args[2:])
+	case "node-audit":
+		err = cmdNodeAudit(os.Args[2:])
 	case "report":
 		err = cmdReport(os.Args[2:])
 	case "help", "--help", "-h":
@@ -60,6 +63,7 @@ Usage:
   blocktack recon     --target FILE [--out FILE]      probe target endpoints (L0/L1)
   blocktack scan      --target FILE [--adapters a,b]  run analysis adapters (Slither, ...)
   blocktack campaign  --target FILE --playbook FILE   execute an attack playbook
+  blocktack node-audit --target FILE [--module m]    L0/L1 node attack-surface audit
   blocktack report    --findings a.json,b.json        merge findings into a markdown report
 
 Targets are YAML files (see examples/targets/). Every target must carry an
@@ -201,6 +205,36 @@ func cmdCampaign(args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "\ncampaign output: %s\n", outDir)
 	return nil
+}
+
+func cmdNodeAudit(args []string) error {
+	fs := flag.NewFlagSet("node-audit", flag.ContinueOnError)
+	targetPath := fs.String("target", "", "path to target YAML (required)")
+	module := fs.String("module", "all", "audit module: all, cve-check, rpc-fuzz, mempool-analysis, peer-analysis")
+	out := fs.String("out", "", "write findings JSON to this file (default: SARIF to stdout)")
+	unsafe := fs.Bool("unsafe", false, "allow non-local endpoints (still requires authorization)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *targetPath == "" {
+		return fmt.Errorf("--target is required")
+	}
+	tgt, err := core.LoadTarget(*targetPath)
+	if err != nil {
+		return err
+	}
+	if err := tgt.ValidateSafeMode(!*unsafe); err != nil {
+		return err
+	}
+	findings, err := nodeaudit.Run(context.Background(), *module, tgt)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "node-audit (%s): %d findings\n", *module, len(findings))
+	if *out != "" {
+		return core.SaveFindingsJSON(findings, *out)
+	}
+	return core.WriteSARIF(os.Stdout, findings)
 }
 
 func cmdReport(args []string) error {

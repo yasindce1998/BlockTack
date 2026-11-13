@@ -1,0 +1,18 @@
+# Target for the node-attack-surface audit (L0/L1).
+# The playbook boots anvil with --no-mining on 127.0.0.1:8545.
+apiVersion: blocktack/v1
+name: node-attack-surface
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: anvil-rpc
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts: []
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet only
+  expires: "2027-12-31T00:00:00Z"
