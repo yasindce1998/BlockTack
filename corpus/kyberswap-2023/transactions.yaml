@@ -1,0 +1,23 @@
+# Ordered attacker transactions for the KyberSwap Elastic (mainnet)
+# incident replay. The provenance script (fetch-raw-txs.sh) re-fetches
+# each raw tx from a public RPC to verify the vendored bytes.
+apiVersion: blocktack/kyberswap-2023/v1
+forkBlock: 18630389 # state after this block: attacker EOA at nonce 7 (deploy), funding already done
+attackBlocks: 18630390-18630409
+attackers:
+  eoa: "0x50275e0b7261559ce1644014d4b78d4aa63be836" # nonces 0-6 funding/bridging, 7 deploy, 8-10 attacks
+  attackContract: "0xaf2acf3d4ab78e4c702256d214a3189a874cdc13"
+  profitHolder: "0xc9b826bad20872eb29f9b1d8af4befe8460b50c6" # "Exploiter 2"
+transactions:
+  - order: 0
+    hash: "0x002ccdb4a53a760cb03984db3e8e91325c4f732458d0f21603f64ebb536e4e6e"
+    description: "attack-contract deployment (CREATE, EOA nonce 7)"
+  - order: 1
+    hash: "0x485e08dc2b6a4b3aeadcb89c3d18a37666dc7d9424961a2091d6b3696792f0f3"
+    description: "ATTACK 1: frxETH/WETH, MONA, MEME, FRAX/USDC pools"
+  - order: 2
+    hash: "0x09a3a12d58b0bb80e33e3fb8e282728551dc430c65d1e520fe0009ec519d75e8"
+    description: "ATTACK 2: wstETH/WETH (10k wstETH flash loan), KNC pools"
+  - order: 3
+    hash: "0x396a83df7361519416a6dc960d394e689dd0f158095cbc6a6a6c387640716f5475"
+    description: "ATTACK 3: ETHx/USDC, ELK/WETH, wstETH/USDC, frxETH/FRAX, HAY/WETH pools"
