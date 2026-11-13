@@ -12,6 +12,7 @@
 
 mod actions;
 mod finding;
+mod simulate;
 
 use finding::Finding;
 use serde::Deserialize;
@@ -121,8 +122,36 @@ async fn dispatch(job: Job) -> Vec<Finding> {
             actions::map_oracles(provider, &collect_addresses(&job)).await
         }
         .await,
-        "erc20-balance" => {
-            let token = job
+        "simulate-tx-sequence" => {
+            let raw_files: Vec<String> = job
+                .options
+                .get("rawFiles")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .unwrap_or_default();
+            let mut reports = Vec::new();
+            if let Some(list) = job.options.get("reports").and_then(Value::as_array) {
+                for r in list {
+                    let account = match r.get("account").and_then(Value::as_str) {
+                        Some(a) => a,
+                        None => continue,
+                    };
+                    let Ok(account) = account.parse() else { continue };
+                    let token = r
+                        .get("token")
+                        .and_then(Value::as_str)
+                        .and_then(|t| t.parse().ok());
+                    let min_profit = r
+                        .get("minProfit")
+                        .and_then(Value::as_str)
+                        .and_then(|m| actions::parse_u256(m).ok());
+                    reports.push(simulate::Report { token, account, min_profit });
+                }
+            }
+            // Runs on a dedicated thread with its own runtime; blocks here.
+            simulate::simulate_tx_sequence(&url, &raw_files, &reports)
+        }
+        "erc20-balance" => {            let token = job
                 .options
                 .get("token")
                 .and_then(Value::as_str)
@@ -166,12 +195,12 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .and_then(Value::as_u64)
                 .unwrap_or(3600);
             async {
-                let provider = actions::connect(&url).await?;
                 actions::oracle_staleness(&url, &feeds, max_staleness).await
             }
             .await
         }
-        "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {            Some(attacker) => {
+        "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {
+            Some(attacker) => {
                 let blocks_ago = job
                     .options
                     .get("blocksAgo")

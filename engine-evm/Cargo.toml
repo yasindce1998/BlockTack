@@ -5,8 +5,9 @@ edition = "2021"
 description = "BlockTack EVM attack engine: deep simulation and exploit execution against EVM chains"
 
 [dependencies]
-alloy = { version = "2.5.0", features = ["providers", "provider-http", "rpc-types"] }
+alloy = { version = "2.5.0", features = ["providers", "provider-http", "rpc-types", "consensus", "k256"] }
 anyhow = "1.0.104"
+revm = { version = "43.0.3", features = ["alloydb", "optional_balance_check", "optional_no_base_fee"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.54.1", features = ["macros", "rt"] }

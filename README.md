@@ -59,6 +59,15 @@ bin/blocktack node-audit --target examples/targets/local-anvil.yaml
 # Off-chain web audit (headers, listings, exposed secrets):
 bin/blocktack node-audit --target corpus/fixtures/off-chain-api/target.yaml --module web-audit
 
+# Eclipse attack execution (requires geth; see playbook header):
+bin/blocktack campaign \
+  --target corpus/fixtures/p2p-eclipse/target.yaml \
+  --playbook playbooks/evm/p2p-eclipse.yaml
+
+# Engagement-grade report from campaign output:
+bin/blocktack report --findings runs/campaigns/<run>/findings.json \
+  --target corpus/fixtures/naive-oracle-vault/target.yaml --engagement
+
 # Run an attack playbook (campaign output lands in runs/campaigns/):
 bin/blocktack campaign \
   --target examples/targets/mainnet-fork.yaml \
