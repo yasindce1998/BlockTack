@@ -1,0 +1,86 @@
+# Stale-oracle detection campaign (BTV-L4-001): deploy a feed whose last
+# update was two days ago and detect it via eth_call.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/fixtures/stale-oracle/target.yaml \
+#     --playbook playbooks/evm/stale-oracle.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: stale-oracle
+description: >
+  Detects an oracle feed that stopped updating: the engine calls
+  latestRoundData() on the deployed feed and compares updatedAt against
+  the chain's block timestamp — the quiet failure mode that precedes
+  many oracle incidents (BTV-L4-001).
+target:
+  chainTypes: [evm]
+  layers: [L4]
+steps:
+  - id: env-up
+    name: Start local anvil node
+    tactic: setup
+    run:
+      type: shell
+      command: anvil
+      args: ["--port", "8545"]
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the RPC endpoint to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 50); do
+            cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 0.2
+          done
+          echo "anvil did not come up" >&2
+          exit 1
+
+  - id: deploy-feed
+    name: Deploy the stale price feed
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY0="$(awk '/Private Keys/{p=1;next} p && /^\(0\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          forge create --broadcast \
+            --root corpus/fixtures/stale-oracle \
+            src/StalePriceFeed.sol:StalePriceFeed \
+            --rpc-url http://127.0.0.1:8545 \
+            --private-key "$KEY0"
+
+  - id: map-oracles
+    name: Map oracle interfaces from deployed bytecode
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: map-oracles
+      options:
+        addresses: ["0x5FbDB2315678afecb367f032d93F642f64180aa3"]
+
+  - id: oracle-staleness
+    name: Check feed freshness against block timestamps
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: oracle-staleness
+      options:
+        feeds: ["0x5FbDB2315678afecb367f032d93F642f64180aa3"]
+        maxStalenessSeconds: 3600
+
+verification:
+  - id: stale-detected
+    expects: oracle-staleness reports a high-severity finding — the feed's last update is ~2 days old
+  - id: interfaces-mapped
+    expects: map-oracles flags latestRoundData()/latestAnswer() in the feed bytecode

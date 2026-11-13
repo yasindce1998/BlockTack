@@ -1,0 +1,22 @@
+# Target for the off-chain API fixture (BTV-L4-003): a plain file
+# server on 127.0.0.1:8787 with a directory listing and an exposed .env.
+apiVersion: blocktack/v1
+name: off-chain-api
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: fixture-api
+    role: api
+    url: http://127.0.0.1:8787
+contracts: []
+components:
+  - name: fixture-file-server
+    kind: indexer
+    note: static file server exposing directory listing and .env
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local fixture only
+  expires: "2027-12-31T00:00:00Z"

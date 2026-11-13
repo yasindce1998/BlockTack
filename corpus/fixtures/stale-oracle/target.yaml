@@ -1,0 +1,24 @@
+# Target for the stale-oracle fixture (BTV-L4-001).
+apiVersion: blocktack/v1
+name: stale-oracle
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: anvil-rpc
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: StalePriceFeed
+    address: "0x5FbDB2315678afecb367f032d93F642f64180aa3" # deterministic when deployed by playbook
+    sourceDir: corpus/fixtures/stale-oracle
+components:
+  - name: StalePriceFeed
+    kind: oracle
+    note: feed whose last update was 2 days ago
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet fixture only
+  expires: "2027-12-31T00:00:00Z"
