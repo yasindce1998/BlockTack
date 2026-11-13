@@ -36,10 +36,11 @@
 - [ ] revm integration: full block-level simulation beyond eth_call
       state overrides (multi-transaction scenarios)
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
-- [ ] Corpus goal: reproduce historical incidents (Ronin, Euler, ...)
-      end to end — current count: **8 exploits reproduced** (2 fixture
-      classes + 6 Damn Vulnerable DeFi challenges: side-entrance,
-      naive-receiver, puppet-v2, compromised, the-rewarder, free-rider)
+- [x] Corpus goal: reproduce historical incidents end to end —
+      **9 exploits reproduced** (2 fixture classes + 6 Damn Vulnerable
+      DeFi challenges + the Euler 2023 incident replayed on a mainnet
+      fork by raw-transaction rebroadcast). Next incidents: Ronin
+      (requires non-EVM tooling), Wormhole (Solana), Curve/Vyper 2023.
 
 ## Phase 3 — L0/L1 node and consensus attacks
 

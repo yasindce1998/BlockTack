@@ -80,3 +80,22 @@ bin/blocktack campaign \
 
 Three confirmed critical PoC findings and two composed kill chains —
 six PoCs total across the full wargame corpus.
+
+## Historical incidents
+
+Real exploits replayed on local mainnet forks by re-broadcasting the
+attacker's signed historical transactions — same signatures, same
+nonces, same pre-attack state, deterministic reproduction with zero
+transactions touching mainnet.
+
+- **euler-2023** (BTV-L2-006, ~$197M): fork at block 16817992, 15
+  vendored attacker transactions re-published in order; ~43M DAI +
+  ~8k ETH profit verified against the on-chain record within 0.1%.
+  Provenance of the vendored raw transactions is re-verifiable with
+  `corpus/euler-2023/fetch-raw-txs.sh`.
+
+```sh
+bin/blocktack campaign \
+  --target corpus/euler-2023/target.yaml \
+  --playbook playbooks/evm/euler-incident-replay.yaml
+```

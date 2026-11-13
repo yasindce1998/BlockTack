@@ -1,0 +1,31 @@
+# Euler Finance mainnet-fork target for the 2023-03-13 incident replay.
+# The playbook forks mainnet at block 16817992 (pre-attack) on a local
+# anvil and re-broadcasts the attacker's signed historical transactions.
+apiVersion: blocktack/v1
+name: euler-2023-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 1
+  fork:
+    enabled: true
+    base: https://eth.drpc.org
+    blockNumber: 16817992
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: euler-attack-contract-1
+    address: "0xeBC29199C817Dc47BA12E3F86102564D640CBf99"
+  - name: euler-attack-contract-2
+    address: "0x036cec1a199234fC02f72d29e596a09440825f1C"
+components:
+  - name: euler-finance
+    kind: node
+    note: Euler protocol (eTokens, liquidation, donateToReserves)
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — read-only queries to public archive RPCs; transactions are broadcast only to the local fork
+  expires: "2027-12-31T00:00:00Z"

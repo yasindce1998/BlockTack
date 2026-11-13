@@ -499,6 +499,78 @@ pub async fn oracle_staleness(
     Ok(findings)
 }
 
+/// erc20-balance: read `balanceOf(account)` on an ERC-20 via eth_call —
+/// used for token profit verification in incident replays.
+///
+/// options:
+///   token:    ERC-20 address
+///   accounts: list of account addresses
+pub async fn erc20_balance(
+    rpc_url: &str,
+    token: &str,
+    accounts: &[String],
+) -> anyhow::Result<Vec<Finding>> {
+    let token: Address = token
+        .parse()
+        .map_err(|e| anyhow::anyhow!("invalid token address {token}: {e}"))?;
+    let provider = connect(rpc_url).await?;
+
+    // calldata prefix = selector("balanceOf(address)")
+    let prefix = encode_calldata("balanceOf(address)", &[])?;
+    let mut findings = Vec::new();
+    for raw in accounts {
+        let account: Address = raw
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid account address {raw}: {e}"))?;
+        let mut call = prefix.clone();
+        let mut word = [0u8; 32];
+        word[12..].copy_from_slice(account.as_slice());
+        call.extend_from_slice(&word);
+
+        let mut tx = TransactionRequest::default();
+        tx.set_to(token);
+        tx.set_input(Bytes::from(call));
+        let result: Result<Bytes, _> = provider.call(tx).await;
+        match result {
+            Ok(res) if res.len() >= 32 => {
+                let balance = U256::from_be_bytes::<32>(res[..32].try_into().unwrap());
+                findings.push(
+                    Finding::new(
+                        "engine-evm-erc20-balance",
+                        format!("ERC-20 balance: {raw}"),
+                        "info",
+                    )
+                    .with("confidence", "confirmed")
+                    .with("layer", "L5")
+                    .with("target", raw.clone())
+                    .with(
+                        "evidence",
+                        format!("token={token} account={raw} balance={balance}"),
+                    ),
+                );
+            }
+            Ok(_) => findings.push(
+                Finding::new(
+                    "engine-evm-erc20-balance",
+                    format!("Short return from balanceOf for {raw}"),
+                    "low",
+                )
+                .with("target", raw.clone()),
+            ),
+            Err(e) => findings.push(
+                Finding::new(
+                    "engine-evm-erc20-balance",
+                    format!("balanceOf call failed for {raw}"),
+                    "low",
+                )
+                .with("target", raw.clone())
+                .with("description", e.to_string()),
+            ),
+        }
+    }
+    Ok(findings)
+}
+
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -555,5 +627,13 @@ mod tests {
             parse_u256("0xde0b6b3a76400000").unwrap(),
             U256::from(16_000_000_000_000_000_000u128)
         );
+    }
+
+    #[test]
+    fn balanceof_calldata_matches_reference() {
+        // balanceOf(address) selector is the well-known 0x70a08231;
+        // the argument is the address right-aligned in one 32-byte word.
+        let calldata = encode_calldata("balanceOf(address)", &[]).unwrap();
+        assert_eq!(hex(&calldata), "70a08231");
     }
 }
