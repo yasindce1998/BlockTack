@@ -1,0 +1,107 @@
+# L0/L1 node attack-surface audit: fingerprint the client, fuzz the RPC
+# surface with malformed input, and inspect mempool/peer exposure.
+#
+# Uses anvil with --no-mining so the mempool retains pending
+# transactions for analysis.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/fixtures/node-attack-surface/target.yaml \
+#     --playbook playbooks/evm/node-attack-surface.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: node-attack-surface
+description: >
+  Audits the node layer: client fingerprinting with CVE
+  cross-referencing, malformed-RPC-input fuzzing (with post-battery
+  health checks for DoS), mempool exposure, and peer-topology analysis.
+target:
+  chainTypes: [evm]
+  layers: [L0, L1]
+steps:
+  - id: env-up
+    name: Start local anvil node (no auto-mining, so the mempool fills)
+    tactic: setup
+    run:
+      type: shell
+      command: anvil
+      args: ["--port", "8545", "--no-mining"]
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the RPC endpoint to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 50); do
+            cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 0.2
+          done
+          echo "anvil did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the chain via the engine
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: cve-check
+    name: Cross-reference client version against the vulnerability DB
+    tactic: discover
+    run:
+      type: builtin
+      action: cve-check
+
+  - id: seed-mempool
+    name: Leave pending transactions in the mempool
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY1="$(awk '/Private Keys/{p=1;next} p && /^\(1\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          KEY2="$(awk '/Private Keys/{p=1;next} p && /^\(2\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          # Two pending transfers (mining is disabled, --async returns the hash)
+          cast send 0x000000000000000000000000000000000000dEaD --value 5ether --async \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY1" >/dev/null
+          cast send 0x000000000000000000000000000000000000dEaD --value 3ether --async \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY2" >/dev/null
+          echo "seeded mempool"
+
+  - id: mempool-analysis
+    name: Check mempool exposure and front-running surface
+    tactic: discover
+    run:
+      type: builtin
+      action: mempool-analysis
+
+  - id: rpc-fuzz
+    name: Fuzz the RPC surface with malformed input
+    tactic: exploit
+    run:
+      type: builtin
+      action: rpc-fuzz
+
+  - id: peer-analysis
+    name: Analyze peer topology for eclipse susceptibility
+    tactic: discover
+    run:
+      type: builtin
+      action: peer-analysis
+
+verification:
+  - id: mempool-visible
+    expects: mempool-analysis reports the seeded pending transactions (BTV-L1-009)
+  - id: fuzz-survival
+    expects: rpc-fuzz either reports clean survival or a DoS finding
+  - id: cve-crossref
+    expects: cve-check emits a finding (DB hit or not-in-db informational)

@@ -41,10 +41,22 @@
 
 ## Phase 3 — L0/L1 node and consensus attacks
 
-- [ ] Client version → known CVE cross-referencing
-- [ ] RPC fuzzing harnesses (AFL++/cargo-fuzz against handlers)
-- [ ] devp2p/libp2p harness: eclipse and sybil test modules
-- [ ] Mempool analysis and sniping playbooks
+- [x] Client version → known-CVE cross-referencing (`cve-check` builtin
+      module; version parsing handles geth/nethermind/besu/anvil
+      formats; seed vulnerability DB in `internal/nodeaudit/nodecves.yaml`)
+- [x] Malformed-RPC-input fuzzing with post-battery health checks —
+      an unresponsive node after the battery is a critical DoS finding
+      (`rpc-fuzz`)
+- [x] Mempool exposure and front-running surface analysis
+      (`mempool-analysis`, BTV-L1-009/BTV-L5-004)
+- [x] Peer-topology exposure and eclipse-susceptibility heuristics
+      (`peer-analysis`, BTV-L0-002/BTV-L1-002)
+- [x] Playbook `playbooks/evm/node-attack-surface.yaml` and CLI command
+      `blocktack node-audit`
+- [ ] devp2p/libp2p protocol-level harness (eclipse/sybil execution,
+      not just topology heuristics)
+- [ ] Timejacking / clock-skew modules
+- [ ] Full client CVE database (the seed ships one verified entry)
 
 ## Phase 4 — L3/L4 cross-chain and off-chain
 

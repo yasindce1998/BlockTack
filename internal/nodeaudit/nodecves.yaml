@@ -1,0 +1,29 @@
+# BlockTack node client vulnerability database.
+#
+# Seed database for the cve-check module: client version fingerprints
+# are matched against `vulnerabilities` and findings are emitted for
+# versions below `fixedIn`.
+#
+# IMPORTANT: entries here must be verified against upstream advisories
+# before being trusted in an engagement. This is a seed, not a complete
+# database — expand it from client release notes and security advisories.
+version: 1
+clients:
+  - name: geth
+    match: "Geth/v"
+    vulnerabilities:
+      - id: CVE-2021-39137
+        summary: >-
+          Memory corruption in the eth protocol message handling (p2p):
+          a malicious peer could crash or potentially execute code on
+          the node
+        fixedIn: "1.10.8"
+        reference: https://github.com/ethereum/go-ethereum/releases/tag/v1.10.8
+        layer: L1
+        weakness: BTV-L1-007
+  - name: nethermind
+    match: "Nethermind/v"
+    vulnerabilities: []
+  - name: besu
+    match: "besu/v"
+    vulnerabilities: []

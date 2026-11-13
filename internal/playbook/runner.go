@@ -14,6 +14,7 @@ import (
 
 	"github.com/blocktack/blocktack/internal/adapter"
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/nodeaudit"
 )
 
 // Runner executes a playbook against a target, collecting findings and
@@ -102,9 +103,25 @@ func (r *Runner) runStep(ctx context.Context, step Step, stepsDir string) error 
 		return r.runEngine(ctx, step, stepsDir)
 	case "adapter":
 		return r.runAdapter(ctx, step)
+	case "builtin":
+		return r.runBuiltin(ctx, step)
 	default:
 		return fmt.Errorf("unknown run type %q", step.Run.Type)
 	}
+}
+
+// runBuiltin executes a Go-resident audit module (see internal/nodeaudit).
+func (r *Runner) runBuiltin(ctx context.Context, step Step) error {
+	if step.Run.Action == "" {
+		return fmt.Errorf("builtin step requires `action`")
+	}
+	findings, err := nodeaudit.Run(ctx, step.Run.Action, r.Target)
+	if err != nil {
+		return err
+	}
+	r.findings = append(r.findings, findings...)
+	r.logf("  builtin %s returned %d findings", step.Run.Action, len(findings))
+	return nil
 }
 
 func (r *Runner) runShell(ctx context.Context, step Step, stepsDir string) error {

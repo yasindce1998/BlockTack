@@ -51,6 +51,9 @@ bin/blocktack matrix  # browse the weakness taxonomy
 anvil &
 bin/blocktack recon --target examples/targets/local-anvil.yaml --out /tmp/findings.json
 
+# Node-layer audit (client CVEs, RPC fuzzing, mempool, peer topology):
+bin/blocktack node-audit --target examples/targets/local-anvil.yaml
+
 # Run an attack playbook (campaign output lands in runs/campaigns/):
 bin/blocktack campaign \
   --target examples/targets/mainnet-fork.yaml \
