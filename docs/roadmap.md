@@ -74,9 +74,17 @@
 
 ## Phase 5 — Correlation + reporting
 
-- [ ] Attack-graph engine: compose multi-layer findings into kill chains
-- [ ] Crypto-adapted scoring (financial blast radius, not just CVSS)
-- [ ] Engagement reports with PoC replay and remediation mapping
+- [x] Kill-chain engine (`internal/correlate`): composes multi-layer
+      findings into single compromise narratives — oracle manipulation,
+      reentrancy drain, node surveillance/eclipse-recon, and off-chain
+      credential exposure chains (the Multichain/Radiant/Bybit shape)
+- [x] Crypto-adapted impact: verified financial blast radius parsed
+      from on-chain balance deltas (reported in ETH + wei)
+- [x] Campaigns auto-correlate: composite findings flow into
+      findings.json/reports; killchains.json written per campaign
+- [ ] Graph-based cross-campaign correlation (same target over time)
+- [ ] Structured engagement report templates (exec summary, remediation
+      mapping back to taxonomy)
 
 ## Phase 6 — Non-EVM expansion
 

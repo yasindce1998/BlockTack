@@ -14,6 +14,7 @@ import (
 
 	"github.com/blocktack/blocktack/internal/adapter"
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/correlate"
 	"github.com/blocktack/blocktack/internal/nodeaudit"
 )
 
@@ -63,6 +64,25 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	r.stopBackground()
+
+	// Correlate findings into kill chains and append composite findings.
+	chains := correlate.Analyze(r.findings)
+	for _, c := range chains {
+		r.logf("kill chain: [%s] %s", c.Severity, c.Title)
+		for _, s := range c.Stages {
+			r.logf("  stage: %s (%s)", s.Description, s.FindingID)
+		}
+		if c.FinancialImpactEth != "" {
+			r.logf("  financial impact: %s ETH (%s wei)", c.FinancialImpactEth, c.FinancialImpactWei)
+		}
+		r.findings = append(r.findings, chainFinding(c))
+	}
+	if len(chains) > 0 {
+		if data, err := json.MarshalIndent(chains, "", "  "); err == nil {
+			_ = os.WriteFile(filepath.Join(r.OutDir, "killchains.json"), data, 0o644)
+		}
+	}
+
 	r.logf("campaign finished: %d findings", len(r.findings))
 	for _, f := range r.findings {
 		r.logf("  [%s] %s (%s)", f.Severity, f.Title, f.Weakness)
@@ -229,6 +249,28 @@ func (r *Runner) runAdapter(ctx context.Context, step Step) error {
 	r.findings = append(r.findings, findings...)
 	r.logf("  adapter %s returned %d findings", a.Name, len(findings))
 	return nil
+}
+
+// chainFinding renders a kill chain as a first-class finding so it
+// flows into reports like any other result.
+func chainFinding(c correlate.KillChain) core.Finding {
+	stages := make([]string, len(c.Stages))
+	for i, s := range c.Stages {
+		stages[i] = fmt.Sprintf("%s [%s]", s.Description, s.FindingID)
+	}
+	f := core.Finding{
+		ID:         c.ID,
+		Title:      c.Title,
+		Severity:   c.Severity,
+		Confidence: core.ConfConfirmed,
+		Description: c.Description + " Stages: " + strings.Join(stages, " -> ") + ".",
+		Source:     "correlate",
+	}
+	if c.FinancialImpactEth != "" {
+		f.Evidence = fmt.Sprintf("verified profit: %s ETH (%s wei)", c.FinancialImpactEth, c.FinancialImpactWei)
+	}
+	f.Normalize()
+	return f
 }
 
 func (r *Runner) stopBackground() {
