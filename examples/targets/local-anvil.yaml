@@ -1,0 +1,19 @@
+# A local anvil node — the default safe target for development and testing.
+# Start one with:  anvil
+apiVersion: blocktack/v1
+name: local-anvil
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: anvil-rpc
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts: []
+components: []
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet only
+  expires: 2027-12-31T00:00:00Z

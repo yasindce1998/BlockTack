@@ -1,0 +1,252 @@
+# BlockTack weakness taxonomy — the machine-readable attack-surface matrix.
+#
+# This is BlockTack's shared vocabulary: findings, playbooks, adapters and
+# reports all reference these IDs. Keep IDs stable once published; add new
+# weaknesses by appending new numbers within a layer.
+#
+# Layers:
+#   L0 Infrastructure        — hosting, RPC exposure, node configuration
+#   L1 Node & Consensus      — clients, p2p, mempool, validators
+#   L2 Contracts & Programs  — EVM, Solana BPF, Move, CosmWasm
+#   L3 Cross-chain           — bridges, relayers, light clients
+#   L4 Off-chain             — oracles, indexers, frontends, custodians
+#   L5 Economic & Governance — incentive design, governance, MEV
+version: 1
+layers:
+  - id: L0
+    name: Infrastructure
+    description: The hosting and network environment the chain runs on
+    weaknesses:
+      - id: BTV-L0-001
+        name: Exposed mempool/txpool RPC namespace
+        description: txpool_* methods reachable without authentication, enabling mempool sniping and front-running
+        tags: [rpc, node-config, mempool]
+      - id: BTV-L0-002
+        name: Node info disclosure via admin namespace
+        description: admin_nodeInfo/admin_peers leak client identity and peer topology to unauthenticated callers
+        tags: [rpc, node-config, information-disclosure]
+      - id: BTV-L0-003
+        name: Node keystore exposure
+        description: personal_*/eth_accounts succeed on a reachable endpoint, indicating loaded and possibly unlocked keys
+        tags: [rpc, key-management]
+      - id: BTV-L0-004
+        name: Outdated node client with known CVEs
+        description: fingerprinted client version is affected by published vulnerabilities
+        tags: [node, patching]
+      - id: BTV-L0-005
+        name: Unauthenticated metrics/debug ports
+        description: Prometheus, Grafana or debug endpoints exposed to the network
+        tags: [monitoring, information-disclosure]
+      - id: BTV-L0-006
+        name: Secrets in node configuration or cloud metadata
+        description: keys, tokens or credentials recoverable from config files, images or the metadata service
+        tags: [secrets, cloud]
+      - id: BTV-L0-007
+        name: Open p2p ports with vulnerable protocol handlers
+        description: devp2p/libp2p listeners reachable with unpatched handshake or message parsing bugs
+        tags: [p2p, node]
+      - id: BTV-L0-008
+        name: Expensive unthrottled RPC methods
+        description: debug_trace*, archive queries or eth_getLogs without rate limits permit denial of service
+        tags: [rpc, dos]
+
+  - id: L1
+    name: Node & Consensus
+    description: Chain clients, peer-to-peer networking, mempool, and validators
+    weaknesses:
+      - id: BTV-L1-001
+        name: Client fingerprinting
+        description: client type/version disclosed via web3_clientVersion or p2p handshakes, aiding targeted attacks
+        tags: [recon, information-disclosure]
+      - id: BTV-L1-002
+        name: Eclipse attack susceptibility
+        description: a victim node's peers can be fully replaced by attacker-controlled nodes
+        tags: [p2p, eclipse]
+      - id: BTV-L1-003
+        name: Sybil peer injection
+        description: peer discovery accepts large numbers of attacker identities cheaply
+        tags: [p2p, sybil]
+      - id: BTV-L1-004
+        name: Deep reorg / finality violation
+        description: on testnets or weak-authority chains, transaction history can be reorganized after confirmation
+        tags: [consensus, reorg]
+      - id: BTV-L1-005
+        name: Long-range attack on weak subjectivity
+        description: PoS chain allows alternative histories from old validator sets
+        tags: [consensus, pos]
+      - id: BTV-L1-006
+        name: Validator or signer key compromise
+        description: consensus-participating keys stolen via node compromise, malware or operational failure
+        tags: [consensus, key-management]
+      - id: BTV-L1-007
+        name: Consensus message handler crash
+        description: malformed p2p or consensus messages crash or hang the client (fuzzing target)
+        tags: [p2p, fuzzing, dos]
+      - id: BTV-L1-008
+        name: Timejacking
+        description: node timestamps skewed via peer time offsets to affect difficulty or ordering logic
+        tags: [consensus, time]
+      - id: BTV-L1-009
+        name: Mempool sniping and transaction leakage
+        description: pending transactions observable or extractable before inclusion
+        tags: [mempool, mev]
+
+  - id: L2
+    name: Contracts & Programs
+    description: On-chain programs — EVM, Solana BPF, Move, CosmWasm
+    weaknesses:
+      - id: BTV-L2-001
+        name: Reentrancy
+        description: external, cross-function and read-only reentrancy across callbacks and hooks
+        tags: [evm, solana, logic]
+      - id: BTV-L2-002
+        name: Broken access control
+        description: missing or incorrect authentication/authorization on privileged functions
+        tags: [access-control]
+      - id: BTV-L2-003
+        name: Manipulable price oracle
+        description: protocol reads spot prices or manipulable feeds as truth
+        tags: [oracle, defi]
+      - id: BTV-L2-004
+        name: Integer overflow/underflow and precision loss
+        description: arithmetic bugs in token math, shares, rewards and rounding
+        tags: [math]
+      - id: BTV-L2-005
+        name: Unchecked external calls
+        description: ignored return values or missing failure handling on low-level calls
+        tags: [evm, logic]
+      - id: BTV-L2-006
+        name: Flash-loan-enabled economic drain
+        description: attack economics change drastically when capital is borrowed for one transaction
+        tags: [defi, flash-loan]
+      - id: BTV-L2-007
+        name: ERC-4626 vault inflation
+        description: first-depositor/rounding attacks on share accounting
+        tags: [defi, erc4626]
+      - id: BTV-L2-008
+        name: Proxy storage collisions
+        description: delegatecall into colliding storage slots or uninitialized implementations
+        tags: [evm, proxy]
+      - id: BTV-L2-009
+        name: Signature replay and malleability
+        description: missing nonce, chainId or domain checks on signed messages
+        tags: [cryptography]
+      - id: BTV-L2-010
+        name: Front-running / MEV-susceptible flows
+        description: order-dependent logic exploitable via priority ordering
+        tags: [mev, defi]
+      - id: BTV-L2-011
+        name: AMM math errors
+        description: tick, liquidity and rounding errors in pools and concentrated liquidity
+        tags: [defi, math]
+      - id: BTV-L2-012
+        name: Compiler or toolchain version bugs
+        description: known compiler bugs (e.g. Vyper reentrancy locks) affect deployed bytecode
+        tags: [toolchain]
+      - id: BTV-L2-013
+        name: Uninitialized logic / UUPS hijack
+        description: upgradeable proxies left uninitialized allow ownership capture
+        tags: [evm, proxy, access-control]
+
+  - id: L3
+    name: Cross-chain
+    description: Bridges, relayers, light clients and cross-domain messaging
+    weaknesses:
+      - id: BTV-L3-001
+        name: Bridge signature verification flaws
+        description: forged, replayed or cross-domain-replayed validator signatures accepted
+        tags: [bridge, cryptography]
+      - id: BTV-L3-002
+        name: Validator/multisig key compromise
+        description: quorum of bridge signer keys stolen or colluding
+        tags: [bridge, key-management]
+      - id: BTV-L3-003
+        name: Cross-domain message replay
+        description: messages valid on one chain/domain accepted on another
+        tags: [bridge, replay]
+      - id: BTV-L3-004
+        name: Forged deposit or withdrawal proofs
+        description: Merkle/IAVL/zero-knowledge proof verification accepts invalid proofs
+        tags: [bridge, proofs]
+      - id: BTV-L3-005
+        name: Trusted relayer takeover
+        description: centralized or under-collateralized relayers can censor, reorder or fabricate messages
+        tags: [bridge, trust]
+      - id: BTV-L3-006
+        name: Misconfigured light client
+        description: wrong genesis, stale validator set or unchecked finality on the destination
+        tags: [bridge, light-client]
+      - id: BTV-L3-007
+        name: Cross-chain liquidity desync
+        description: accounting between source and destination chains drifts, enabling over-issuance
+        tags: [bridge, accounting]
+
+  - id: L4
+    name: Off-chain
+    description: Oracles, indexers, frontends, custodians and key management
+    weaknesses:
+      - id: BTV-L4-001
+        name: Oracle operator key compromise
+        description: feed publishers or their keys compromised; price or data feeds manipulated
+        tags: [oracle, key-management]
+      - id: BTV-L4-002
+        name: Frontend supply-chain compromise
+        description: drainer kits, compromised npm packages or hijacked CDN serving malicious UI
+        tags: [frontend, supply-chain]
+      - id: BTV-L4-003
+        name: Indexer/API authorization flaws
+        description: graph, API or admin endpoints expose data or mutations without authz
+        tags: [api, access-control]
+      - id: BTV-L4-004
+        name: Custodian or hot-wallet key management failure
+        description: signer infrastructure (HSMs, MPC, multisig laptops) compromised
+        tags: [custody, key-management]
+      - id: BTV-L4-005
+        name: Subgraph/indexing logic errors
+        description: incorrect indexing yields wrong balances or state to consumers that trust it
+        tags: [indexer]
+      - id: BTV-L4-006
+        name: DNS or BGP hijack
+        description: domain or routing takeover redirects users to attacker infrastructure
+        tags: [network, dns]
+      - id: BTV-L4-007
+        name: Web2 account takeover of privileged users
+        description: email, social or SIM-swap compromise of deployers, maintainers or signers
+        tags: [social, accounts]
+
+  - id: L5
+    name: Economic & Governance
+    description: Incentive design, governance processes and MEV
+    weaknesses:
+      - id: BTV-L5-001
+        name: Governance flash-loan vote seizure
+        description: voting power borrowed to pass malicious proposals within one transaction
+        tags: [governance, flash-loan]
+      - id: BTV-L5-002
+        name: Guardian/admin parameter abuse
+        description: emergency or admin powers exceed their intended scope without timelock
+        tags: [governance, access-control]
+      - id: BTV-L5-003
+        name: Low-liquidity venue price manipulation
+        description: thin markets used as price references or exit liquidity
+        tags: [defi, market]
+      - id: BTV-L5-004
+        name: MEV sandwich attacks
+        description: user trades extractable via ordering on public mempools
+        tags: [mev]
+      - id: BTV-L5-005
+        name: Restaking correlated-slashing risk
+        description: shared security across AVS/services creates correlated failure modes
+        tags: [restaking, consensus]
+      - id: BTV-L5-006
+        name: Stablecoin peg attacks
+        description: reflexivity and liquidity flight exploited to break or profit from depeg
+        tags: [stablecoin, defi]
+      - id: BTV-L5-007
+        name: Airdrop and farming exploitation
+        description: sybil attacks or reward-gaming drain incentive programs
+        tags: [airdrop, sybil]
+      - id: BTV-L5-008
+        name: L2 sequencer censorship or withholding
+        description: centralized sequencers reorder, censor or withhold transactions and forced-inclusion exits
+        tags: [l2, sequencer]

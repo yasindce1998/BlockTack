@@ -1,0 +1,119 @@
+# BlockTack known-exploits regression corpus.
+#
+# Every entry is a real incident that BlockTack should eventually detect,
+# reproduce, or simulate. The goal metric for the platform is simple:
+# how many of these can a campaign replay end to end on a forked chain?
+#
+# status:
+#   pending    — not yet covered
+#   detected   — tooling flags the weakness class on the replayed target
+#   reproduced — a playbook executes the exploit end to end with verified PnL
+apiVersion: blocktack/corpus/v1
+exploits:
+  - id: ronin-bridge-2022
+    title: Ronin Bridge validator key compromise
+    year: 2022
+    layers: [L3]
+    weakness: BTV-L3-002
+    reference: https://rekt.news/ronin-rekt/
+    status: pending
+    notes: 5 of 9 validator keys compromised via social engineering and compromised nodes
+
+  - id: wormhole-2022
+    title: Wormhole signature verification flaw
+    year: 2022
+    layers: [L3]
+    weakness: BTV-L3-001
+    reference: https://rekt.news/wormhole-rekt/
+    status: pending
+    notes: fake guardian set spoofed into the bridge
+
+  - id: harmony-bridge-2022
+    title: Horizon Bridge multisig compromise
+    year: 2022
+    layers: [L3]
+    weakness: BTV-L3-002
+    reference: https://rekt.news/harmony-rekt/
+    status: pending
+    notes: 2-of-5 multisig keys stolen
+
+  - id: bnb-bridge-2022
+    title: BNB Bridge IAVL proof forgery
+    year: 2022
+    layers: [L3]
+    weakness: BTV-L3-004
+    reference: https://rekt.news/bnb-bridge-rekt/
+    status: pending
+    notes: forged proof minted precompile tokens
+
+  - id: mango-markets-2022
+    title: Mango Markets oracle price manipulation
+    year: 2022
+    layers: [L2, L5]
+    weakness: BTV-L2-003
+    reference: https://rekt.news/mango-rekt/
+    status: pending
+    notes: on-chain oracle pumped with attacker's own holdings; Solana target
+
+  - id: euler-2023
+    title: Euler Finance donate/flash-loan exploit
+    year: 2023
+    layers: [L2]
+    weakness: BTV-L2-006
+    reference: https://rekt.news/euler-rekt/
+    status: pending
+    notes: donated funds bypassed health checks; flash-loan amplified
+
+  - id: curve-vyper-2023
+    title: Curve Vyper reentrancy (compiler bug)
+    year: 2023
+    layers: [L2]
+    weakness: BTV-L2-012
+    reference: https://rekt.news/curve-vyper-rekt/
+    status: pending
+    notes: broken reentrancy locks in specific Vyper versions
+
+  - id: multichain-2023
+    title: Multichain key management failure
+    year: 2023
+    layers: [L4]
+    weakness: BTV-L4-004
+    reference: https://rekt.news/multichain-rekt/
+    status: pending
+    notes: MPC keys controlled by a single person
+
+  - id: kyberswap-2023
+    title: KyberSwap Elastic liquidity math exploit
+    year: 2023
+    layers: [L2]
+    weakness: BTV-L2-011
+    reference: https://rekt.news/kyberswap-rekt/
+    status: pending
+    notes: tick rounding/double-spend in concentrated liquidity
+
+  - id: radiant-2024
+    title: Radiant Capital signer compromise
+    year: 2024
+    layers: [L4]
+    weakness: BTV-L4-004
+    reference: https://rekt.news/radiant-rekt-2/
+    status: pending
+    notes: malware on signer machines; malicious transactions signed blind
+
+  - id: bybit-2025
+    title: Bybit Safe frontend/signer compromise
+    year: 2025
+    layers: [L4]
+    weakness: BTV-L4-002
+    reference: https://rekt.news/bybit-rekt/
+    status: pending
+    notes: compromised signing UI showed benign data while signing malicious transactions
+
+  - id: cetus-2025
+    title: Cetus Protocol integer overflow (Solana)
+    year: 2025
+    layers: [L2]
+    weakness: BTV-L2-004
+    reference: https://rekt.news/cetus-rekt/
+    status: pending
+    notes: checked_math bypass in liquidity math; non-EVM target
