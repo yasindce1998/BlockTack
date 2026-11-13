@@ -57,8 +57,10 @@ Everything crossing a language or process boundary is JSON:
   ordered steps of type `engine`, `adapter`, `builtin`, `shell`, or
   `manual`. `builtin` steps run Go-resident audit modules
   (`internal/nodeaudit`: cve-check, rpc-fuzz, mempool-analysis,
-  peer-analysis). Shell steps receive `BLOCKTACK_OUT_DIR` in their
-  environment, pointing at the campaign output directory, so later
+  peer-analysis, web-audit). Campaigns end with automatic correlation:
+  findings are composed into kill chains (`internal/correlate`) and the
+  composite findings flow into reports. Shell steps receive
+  `BLOCKTACK_OUT_DIR` in their environment, pointing at the campaign output directory, so later
   steps can parse artifacts of earlier ones (e.g. anvil's printed
   keys, `forge create` addresses). Environment expansion is the
   shell's job — use `sh -c` for anything dynamic.
