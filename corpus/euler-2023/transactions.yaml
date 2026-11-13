@@ -1,0 +1,59 @@
+# Ordered attacker transactions for the Euler Finance incident replay.
+# File names in transactions/ carry the same order; the provenance script
+# (fetch-raw-txs.sh) re-fetches each raw tx from a public RPC to verify
+# the vendored bytes.
+apiVersion: blocktack/euler-2023/v1
+forkBlock: 16817992 # state after this block: both attacker EOAs at nonce 0
+firstAttackBlock: 16817996
+lastAttackBlock: 16818085
+attackers:
+  eoa1: "0x5f259d0b76665c337c6104145894f4d1d2758b8c" # first attack tx
+  eoa2: "0xb2698c2d99ad2c302a95a8db26b08d17a77cedd4" # attacks 2-6
+  attackContract1: "0xeBC29199C817Dc47BA12E3F86102564D640CBf99" # DAI attack
+  attackContract2: "0x036cec1a199234fC02f72d29e596a09440825f1C" # attacks 2-6
+transactions:
+  - order: 1
+    hash: "0x50dc9c9126519a70319cc312418488145bed4e2ef6e110eb864a97f5beaeca05"
+    description: "EOA2 nonce 0: deploy attack contract 2"
+  - order: 2
+    hash: "0x725db76cf4bf3bdc72be4f755ed72df4adbc8e4e803c044617cc11e34907ccdc"
+    description: "EOA1 nonce 0: deploy attack contract 1"
+  - order: 3
+    hash: "0xc310a0affe2169d1f6feec1c63dbc7f7c62a887fa48795d327d4d2da2d6b111d"
+    description: "ATTACK 1: 30M DAI Aave v2 flash loan, donateToReserves, self-liquidation"
+  - order: 4
+    hash: "0x684f82f596f8d211b85893abf85a9e1d9d686bfd5c17131467f93eb782bd1d2d"
+    description: "deploy copycat 'MEV bot' contract (on-chain message)"
+  - order: 5
+    hash: "0xa476fad72c8f4ee15fd2d75ecda4701d8f3ac74431aa453521f13a01c8688142"
+    description: "attack contract 2 profit sweep"
+  - order: 6
+    hash: "0x47ac3527d02e6b9631c77fad1cdee7bfa77a8a7bfd4880dccbda5146ace4088f"
+    description: "ATTACK 2 (no-op path on the fork; value captured by later sweeps)"
+  - order: 7
+    hash: "0x68eb306c558d45e777c8d588e611db5323a6a5021a9f551bc0be915ef5e24691"
+    description: "fund movement (Tornado)"
+  - order: 8
+    hash: "0xe237c57ccf8664411cae71a50b1e94b21dde7a0e096f0cceaa7f432db8151366"
+    description: "fund movement (Tornado)"
+  - order: 9
+    hash: "0x71a908be0bef6174bccc3d493becdfd28395d78898e355d451cb52f7bac38617"
+    description: "ATTACK 3"
+  - order: 10
+    hash: "0x6e9bb8fa66c65dbdb23cfe1a50de1ace48593077f8609cff3ef9da19412062cc"
+    description: "attack contract 2 profit sweep"
+  - order: 11
+    hash: "0x62bd3d31a7b75c098ccf28bc4d4af8c4a191b4b9e451fab4232258079e8b18c4"
+    description: "ATTACK 4"
+  - order: 12
+    hash: "0x465a6780145f1efe3ab52f94c006065575712d2003d83d85481f3d110ed131d9"
+    description: "ATTACK 5 (no-op path on the fork)"
+  - order: 13
+    hash: "0x9f43b6577f513435368b4b339a24932a9b2465906bc5ac8a1b1239d7bef0f705"
+    description: "fund movement"
+  - order: 14
+    hash: "0x7fea1b4d9500d5f2eba22b9e7ff61b4eb36554cafac4f0952ddd4c39761829fe"
+    description: "fund movement"
+  - order: 15
+    hash: "0x3097830e9921e4063d334acb82f6a79374f76f0b1a8f857e89b89bc58df1f311"
+    description: "ATTACK 6 (final attack)"

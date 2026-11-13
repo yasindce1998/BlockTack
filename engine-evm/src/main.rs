@@ -121,6 +121,25 @@ async fn dispatch(job: Job) -> Vec<Finding> {
             actions::map_oracles(provider, &collect_addresses(&job)).await
         }
         .await,
+        "erc20-balance" => {
+            let token = job
+                .options
+                .get("token")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let accounts: Vec<String> = job
+                .options
+                .get("accounts")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .unwrap_or_default();
+            async {
+                let token = token
+                    .ok_or_else(|| anyhow::anyhow!("erc20-balance requires options.token"))?;
+                actions::erc20_balance(&url, &token, &accounts).await
+            }
+            .await
+        }
         "simulate-call" => actions::simulate_call(&url, &job.options).await,
         "oracle-staleness" => {
             let feeds: Vec<String> = job
