@@ -92,10 +92,16 @@ def run(target: dict, options: dict) -> list:
         text=True,
     )
     suites = _parse_suites(test.stdout)
+    weakness_by_suite = options.get("weaknessBySuite") or {}
     for suite, testcases in suites.items():
         for name, case in testcases.items():
             success = case.get("success", False)
             is_poc = bool(POC_PATTERN.search(name))
+            weakness = options.get("weakness", "")
+            for fragment, w in weakness_by_suite.items():
+                if fragment in suite:
+                    weakness = w
+                    break
             if is_poc and success:
                 findings.append({
                     "id": f"foundry-poc-{suite}-{name}",
@@ -103,7 +109,7 @@ def run(target: dict, options: dict) -> list:
                     "severity": "critical",
                     "confidence": "confirmed",
                     "layer": "L2",
-                    "weakness": options.get("weakness", ""),
+                    "weakness": weakness,
                     "source": "foundry",
                     "description": (
                         f"Exploit PoC {name} in {suite} passed — the vulnerability "

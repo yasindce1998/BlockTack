@@ -1,0 +1,24 @@
+# Damn Vulnerable DeFi (vendored, trimmed to 3 challenges) — the first
+# real corpus entries with status: reproduced.
+#
+# The foundry adapter runs the exploit PoCs in its own EVM; no chain
+# endpoint is needed, so the target defines none.
+apiVersion: blocktack/v1
+name: damn-vulnerable-defi
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints: []
+contracts:
+  - name: side-entrance
+    sourceDir: corpus/damn-vulnerable-defi
+  - name: naive-receiver
+    sourceDir: corpus/damn-vulnerable-defi
+  - name: puppet-v2
+    sourceDir: corpus/damn-vulnerable-defi
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local in-process foundry EVM only — no network targets
+  expires: "2027-12-31T00:00:00Z"

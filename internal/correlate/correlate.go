@@ -67,6 +67,21 @@ func profitVerified(f core.Finding) bool {
 	return f.ID == "engine-evm-verify-pnl" && strings.Contains(f.Title, "profit verified")
 }
 
+func pocPassed(f core.Finding) bool {
+	return strings.HasPrefix(f.ID, "foundry-poc-") &&
+		core.SeverityRank(f.Severity) >= core.SeverityRank(core.SevCritical)
+}
+
+// appendStage adds a stage unless one with the same finding ID exists.
+func (c *KillChain) appendStage(s Stage) {
+	for _, existing := range c.Stages {
+		if existing.FindingID == s.FindingID {
+			return
+		}
+	}
+	c.Stages = append(c.Stages, s)
+}
+
 // economicDrainChain composes the flagship pattern: a weakness was
 // found, confirmed by simulation, executed on-chain, and profited from.
 func economicDrainChain(findings []core.Finding) []KillChain {
@@ -74,26 +89,33 @@ func economicDrainChain(findings []core.Finding) []KillChain {
 		id       string
 		title    string
 		weakness string
+		alt      string // alternate weakness signal (e.g. compiler warning)
 	}
 	patterns := []pattern{
 		{id: "killchain-oracle-manipulation", title: "End-to-end oracle manipulation kill chain", weakness: "BTV-L2-003"},
-		{id: "killchain-reentrancy-drain", title: "End-to-end reentrancy drain kill chain", weakness: "BTV-L2-001"},
+		{id: "killchain-reentrancy-drain", title: "End-to-end reentrancy drain kill chain", weakness: "BTV-L2-001", alt: "BTV-L2-005"},
 	}
 	var chains []KillChain
 	for _, p := range patterns {
-		weakness, hasWeakness := has(findings, byWeakness(p.weakness))
+		isChainWeakness := func(f core.Finding) bool {
+			return f.Weakness == p.weakness || (p.alt != "" && f.Weakness == p.alt)
+		}
+		weakness, hasWeakness := has(findings, isChainWeakness)
 		if !hasWeakness {
-			// Reentrancy also enters via the unchecked-call compiler signal.
-			if p.weakness == "BTV-L2-001" {
-				weakness, hasWeakness = has(findings, byWeakness("BTV-L2-005"))
-			}
-			if !hasWeakness {
-				continue
-			}
+			continue
 		}
 		sim, hasSim := has(findings, simulationSuccess)
 		profit, hasProfit := has(findings, profitVerified)
+		// The PoC stage must be the one carrying this chain's weakness,
+		// not just any passing PoC.
+		poc, hasPoc := has(findings, func(f core.Finding) bool {
+			return pocPassed(f) && isChainWeakness(f)
+		})
 
+		weaknessDesc := fmt.Sprintf("Weakness identified: %s", weakness.Title)
+		if pocPassed(weakness) {
+			weaknessDesc = "Exploit reproduced end to end by a passing forge PoC"
+		}
 		chain := KillChain{
 			ID:       p.id,
 			Title:    p.title,
@@ -103,7 +125,7 @@ func economicDrainChain(findings []core.Finding) []KillChain {
 					"identified, its exploit premise confirmed by state-override simulation, "+
 					"and (if executed) profit verified on-chain.", p.weakness),
 			Stages: []Stage{{
-				Description: fmt.Sprintf("Weakness identified: %s", weakness.Title),
+				Description: weaknessDesc,
 				FindingID:   weakness.ID,
 				Layer:       weakness.Layer,
 			}},
@@ -129,6 +151,15 @@ func economicDrainChain(findings []core.Finding) []KillChain {
 				chain.Description += fmt.Sprintf(
 					" Verified financial impact: %s ETH extracted.", chain.FinancialImpactEth)
 			}
+		} else if hasPoc {
+			// A passing forge PoC is execution + verification in one:
+			// the test's own assertions confirmed the drain.
+			chain.Severity = core.SevCritical
+			chain.appendStage(Stage{
+				Description: "Exploit reproduced end to end by a passing forge PoC",
+				FindingID:   poc.ID,
+				Layer:       poc.Layer,
+			})
 		}
 		chains = append(chains, chain)
 	}
