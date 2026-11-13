@@ -4,7 +4,8 @@ out = "out"
 libs = ["lib"]
 fs_permissions = [
     { access = "read", path = "./builds/uniswap/"},
-    { access = "read", path = "./test/withdrawal/withdrawals.json"}
+    { access = "read", path = "./test/the-rewarder/dvt-distribution.json"},
+    { access = "read", path = "./test/the-rewarder/weth-distribution.json"}
 ]
 bytecode_hash = "none"
 optimizer = true

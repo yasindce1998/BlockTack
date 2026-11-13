@@ -68,6 +68,9 @@ challenge provenance**, tracked in `manifest.yaml` under `wargames`:
 | side-entrance  | BTV-L2-001 | flash loan "repaid" via the pool's own deposit    |
 | naive-receiver | BTV-L2-002 | fee drain + `_msgSender()` forgery via delegatecall |
 | puppet-v2      | BTV-L2-003 | oracle crash by dumping tokens into the price pair |
+| compromised    | BTV-L2-003 | two of three oracle source keys leaked; median crashed to buy an NFT for 1 wei, then pumped to drain the exchange |
+| the-rewarder   | BTV-L2-009 | distributor's double-claim bitmap latches once per run; one valid Merkle claim replays ~1700x in a single call |
+| free-rider     | BTV-L5-003 | buyMany pays once for all NFTs and refunds the buyer; V2 flash swap funds the stake — ~120 ETH extracted |
 
 ```sh
 bin/blocktack campaign \
@@ -75,4 +78,5 @@ bin/blocktack campaign \
   --playbook playbooks/evm/damn-vulnerable-defi.yaml
 ```
 
-Three confirmed critical PoC findings and two composed kill chains.
+Three confirmed critical PoC findings and two composed kill chains —
+six PoCs total across the full wargame corpus.
