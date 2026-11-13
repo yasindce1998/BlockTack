@@ -242,7 +242,7 @@ pub async fn verify_pnl(
 /// encode_calldata builds `selector || 32-byte big-endian words` for
 /// function signatures with uint256 arguments only (the common case for
 /// exploit parameters like borrow amounts).
-fn encode_calldata(signature: &str, uint_args: &[U256]) -> anyhow::Result<Vec<u8>> {
+pub fn encode_calldata(signature: &str, uint_args: &[U256]) -> anyhow::Result<Vec<u8>> {
     let sel = selector(signature);
     let mut calldata = Vec::with_capacity(4 + 32 * uint_args.len());
     calldata.extend_from_slice(&sel);

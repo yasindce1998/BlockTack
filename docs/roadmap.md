@@ -33,8 +33,12 @@
 - [x] Second end-to-end campaign: reentrancy drain fully simulated via
       eth_call (reentrancy executes in simulation) then executed
       on-chain (`playbooks/evm/reentrant-vault.yaml`)
-- [ ] revm integration: full block-level simulation beyond eth_call
-      state overrides (multi-transaction scenarios)
+- [x] revm integration: `simulate-tx-sequence` executes raw transaction
+      sequences entirely in memory against fork state (AlloyDB +
+      WrapDatabaseAsync, simulation cfg flags) — validated mainnet-exact
+      on the Curve corpus: identical gasUsed per transaction and profit
+      exact to the wei, with zero broadcasts; wired as a simulate-first
+      step in the Curve playbook before the fork execution
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
 - [x] Corpus goal: reproduce historical incidents end to end —
       **11 exploits reproduced** (2 fixture classes + 6 Damn Vulnerable
@@ -59,8 +63,11 @@
       (`peer-analysis`, BTV-L0-002/BTV-L1-002)
 - [x] Playbook `playbooks/evm/node-attack-surface.yaml` and CLI command
       `blocktack node-audit`
-- [ ] devp2p/libp2p protocol-level harness (eclipse/sybil execution,
-      not just topology heuristics)
+- [x] devp2p eclipse execution (`p2p-eclipse` builtin module +
+      `playbooks/evm/p2p-eclipse.yaml`): a geth swarm (10 nodes, shared
+      PoS genesis) fills all of a victim geth's inbound peer slots;
+      admin_peers concentration verifies the eclipse state — critical
+      confirmed finding (BTV-L1-002)
 - [ ] Timejacking / clock-skew modules
 - [ ] Full client CVE database (the seed ships one verified entry)
 
@@ -89,8 +96,12 @@
 - [x] Campaigns auto-correlate: composite findings flow into
       findings.json/reports; killchains.json written per campaign
 - [ ] Graph-based cross-campaign correlation (same target over time)
-- [ ] Structured engagement report templates (exec summary, remediation
-      mapping back to taxonomy)
+- [x] Structured engagement reports: `blocktack report --engagement`
+      renders a client-ready deliverable — scope & authorization
+      statement, executive summary, kill chains, taxonomy-enriched
+      findings with per-weakness remediation guidance (all 52 weaknesses
+      carry remediation data), remediation summary table, methodology
+      appendix
 
 ## Phase 6 — Non-EVM expansion
 

@@ -20,34 +20,42 @@ layers:
       - id: BTV-L0-001
         name: Exposed mempool/txpool RPC namespace
         description: txpool_* methods reachable without authentication, enabling mempool sniping and front-running
+        remediation: Disable the txpool namespace on publicly reachable nodes (e.g. geth's --txpool.api none) or front the RPC endpoint with an authenticated reverse proxy; txpool_* must never answer unauthenticated callers.
         tags: [rpc, node-config, mempool]
       - id: BTV-L0-002
         name: Node info disclosure via admin namespace
         description: admin_nodeInfo/admin_peers leak client identity and peer topology to unauthenticated callers
+        remediation: Disable the admin, debug, and personal namespaces on any interface reachable beyond loopback, and expose only the eth_* methods clients actually need through an authenticated gateway.
         tags: [rpc, node-config, information-disclosure]
       - id: BTV-L0-003
         name: Node keystore exposure
         description: personal_*/eth_accounts succeed on a reachable endpoint, indicating loaded and possibly unlocked keys
+        remediation: Never run a reachable RPC endpoint with unlocked accounts; move signing into a dedicated process or HSM, and restrict keystore directory permissions so the node process holds only the keys it must.
         tags: [rpc, key-management]
       - id: BTV-L0-004
         name: Outdated node client with known CVEs
         description: fingerprinted client version is affected by published vulnerabilities
+        remediation: Upgrade to a supported client release, subscribe to client security advisories and chain-fork alerts, and patch within a defined SLA — crash-type and consensus-split CVEs are exploitable network-wide.
         tags: [node, patching]
       - id: BTV-L0-005
         name: Unauthenticated metrics/debug ports
         description: Prometheus, Grafana or debug endpoints exposed to the network
+        remediation: Bind metrics and debug endpoints to loopback or an internal interface, require authentication at the proxy for anything that must be exposed, and rate-limit dashboard endpoints.
         tags: [monitoring, information-disclosure]
       - id: BTV-L0-006
         name: Secrets in node configuration or cloud metadata
         description: keys, tokens or credentials recoverable from config files, images or the metadata service
+        remediation: Remove secrets from config files and container images, enforce IMDSv2 (or disable the metadata service) on node workloads, and rotate every credential that was recoverable from the exposed location.
         tags: [secrets, cloud]
       - id: BTV-L0-007
         name: Open p2p ports with vulnerable protocol handlers
         description: devp2p/libp2p listeners reachable with unpatched handshake or message parsing bugs
+        remediation: Keep p2p protocol handlers patched with current client releases, disable unused subprotocols, and firewall p2p ports to known peer or network ranges where the topology permits.
         tags: [p2p, node]
       - id: BTV-L0-008
         name: Expensive unthrottled RPC methods
         description: debug_trace*, archive queries or eth_getLogs without rate limits permit denial of service
+        remediation: Apply per-IP and per-method rate limits at the RPC gateway, restrict debug_trace* and heavy archive queries to authenticated internal users, and set gas caps and batch-size limits on public endpoints.
         tags: [rpc, dos]
 
   - id: L1
@@ -57,38 +65,47 @@ layers:
       - id: BTV-L1-001
         name: Client fingerprinting
         description: client type/version disclosed via web3_clientVersion or p2p handshakes, aiding targeted attacks
+        remediation: Treat the client version as public information — keep nodes on current releases so fingerprinting yields no exploitable CVEs, and set a generic agent string where the client allows it.
         tags: [recon, information-disclosure]
       - id: BTV-L1-002
         name: Eclipse attack susceptibility
         description: a victim node's peers can be fully replaced by attacker-controlled nodes
+        remediation: Maintain a diverse set of trusted bootstrap and static peers, keep the number of outbound connections well above inbound, and alert on abrupt changes in peer-table composition.
         tags: [p2p, eclipse]
       - id: BTV-L1-003
         name: Sybil peer injection
         description: peer discovery accepts large numbers of attacker identities cheaply
+        remediation: Raise the cost of peer identity with peer scoring and per-IP/ASN connection limits, and monitor peer discovery for identity floods before they enable eclipse or spam attacks.
         tags: [p2p, sybil]
       - id: BTV-L1-004
         name: Deep reorg / finality violation
         description: on testnets or weak-authority chains, transaction history can be reorganized after confirmation
+        remediation: Act on transactions only after finality (e.g. two epochs on Ethereum-style PoS), and on weak-authority chains anchor trust to a finality-aware light client or externally checkpointed state.
         tags: [consensus, reorg]
       - id: BTV-L1-005
         name: Long-range attack on weak subjectivity
         description: PoS chain allows alternative histories from old validator sets
+        remediation: Configure weak-subjectivity checkpoints from a trusted source, require new nodes to sync from a recent checkpoint, and reject chains rooted in validator sets older than the weak-subjectivity period.
         tags: [consensus, pos]
       - id: BTV-L1-006
         name: Validator or signer key compromise
         description: consensus-participating keys stolen via node compromise, malware or operational failure
+        remediation: Hold validator keys in HSMs or remote signers separated from the node's network-exposed process, use distinct keys per role, and alert on signing operations that could trigger slashing.
         tags: [consensus, key-management]
       - id: BTV-L1-007
         name: Consensus message handler crash
         description: malformed p2p or consensus messages crash or hang the client (fuzzing target)
+        remediation: Run current client releases with upstream fuzzing in CI, and report handler crashes to client maintainers immediately — crash-only bugs on consensus paths are network-wide DoS.
         tags: [p2p, fuzzing, dos]
       - id: BTV-L1-008
         name: Timejacking
         description: node timestamps skewed via peer time offsets to affect difficulty or ordering logic
+        remediation: Limit the number of accepted peer time-offset samples, anchor the node to an NTP-secured system clock, and reject peers whose reported offsets fall outside sane bounds.
         tags: [consensus, time]
       - id: BTV-L1-009
         name: Mempool sniping and transaction leakage
         description: pending transactions observable or extractable before inclusion
+        remediation: For order-sensitive flows, use commit-reveal or batch-auction settlement and private submission paths (direct-to-builder), and treat any public mempool as adversary-visible.
         tags: [mempool, mev]
 
   - id: L2
@@ -98,54 +115,67 @@ layers:
       - id: BTV-L2-001
         name: Reentrancy
         description: external, cross-function and read-only reentrancy across callbacks and hooks
+        remediation: Follow checks-effects-interactions ordering, guard state-mutating entry points with reentrancy locks, and prefer pull payments over pushing funds to untrusted receivers.
         tags: [evm, solana, logic]
       - id: BTV-L2-002
         name: Broken access control
         description: missing or incorrect authentication/authorization on privileged functions
+        remediation: Centralize authorization in one vetted library (e.g. OpenZeppelin AccessControl), assign explicit roles to every function, and test each privileged path for unauthorized callers.
         tags: [access-control]
       - id: BTV-L2-003
         name: Manipulable price oracle
         description: protocol reads spot prices or manipulable feeds as truth
+        remediation: Use manipulation-resistant price data — TWAP or multi-source oracle aggregation with staleness and deviation checks — and add circuit breakers that pause sensitive operations when prices move beyond plausible bounds.
         tags: [oracle, defi]
       - id: BTV-L2-004
         name: Integer overflow/underflow and precision loss
         description: arithmetic bugs in token math, shares, rewards and rounding
+        remediation: Compile with Solidity >=0.8 checked arithmetic (or SafeMath on older versions), validate input magnitudes, and round share and reward math in the protocol's favor.
         tags: [math]
       - id: BTV-L2-005
         name: Unchecked external calls
         description: ignored return values or missing failure handling on low-level calls
+        remediation: Handle the return value of every external interaction explicitly, or use revert-on-failure semantics, so a failed dependency cannot silently corrupt protocol state.
         tags: [evm, logic]
       - id: BTV-L2-006
         name: Flash-loan-enabled economic drain
         description: attack economics change drastically when capital is borrowed for one transaction
+        remediation: Value positions against post-manipulation prices (TWAP or robust aggregated feeds), cap state changes achievable within a single block, and stress-test protocol economics under borrowed-capital assumptions.
         tags: [defi, flash-loan]
       - id: BTV-L2-007
         name: ERC-4626 vault inflation
         description: first-depositor/rounding attacks on share accounting
+        remediation: Deploy vaults with a share-decimal floor or virtual-share offset (as in OpenZeppelin's ERC4626) and round exchange-rate math against the depositor so inflation attacks yield dust.
         tags: [defi, erc4626]
       - id: BTV-L2-008
         name: Proxy storage collisions
         description: delegatecall into colliding storage slots or uninitialized implementations
+        remediation: Use namespaced storage slots (ERC-7201) for upgradeable data, never reorder or remove inherited state variables across upgrades, and verify deployed layouts with storage-diff tooling before each upgrade.
         tags: [evm, proxy]
       - id: BTV-L2-009
         name: Signature replay and malleability
         description: missing nonce, chainId or domain checks on signed messages
+        remediation: Bind every signed message to a nonce, chainId, and EIP-712 domain, and use vetted libraries (OpenZeppelin ECP712/Nonces) instead of hand-rolled ecrecover flows.
         tags: [cryptography]
       - id: BTV-L2-010
         name: Front-running / MEV-susceptible flows
         description: order-dependent logic exploitable via priority ordering
+        remediation: Make flows order-independent — batch auctions, commit-reveal, user-controlled slippage bounds — or batch order-sensitive operations under a trusted per-block operator.
         tags: [mev, defi]
       - id: BTV-L2-011
         name: AMM math errors
         description: tick, liquidity and rounding errors in pools and concentrated liquidity
+        remediation: Use audited curve-math libraries, property-test pool invariants with fuzzing (mint/swap/burn round trips), and verify rounding direction always favors the pool.
         tags: [defi, math]
       - id: BTV-L2-012
         name: Compiler or toolchain version bugs
         description: known compiler bugs (e.g. Vyper reentrancy locks) affect deployed bytecode
+        remediation: Pin toolchain versions and track them against published bug lists; when a critical bug affects deployed bytecode, plan a migration (or pause) since recompilation alone does not change live contracts.
         tags: [toolchain]
       - id: BTV-L2-013
         name: Uninitialized logic / UUPS hijack
         description: upgradeable proxies left uninitialized allow ownership capture
+        remediation: Initialize logic contracts in the same deployment script that deploys the proxy, and verify on-chain that every implementation is initialized and owned before funding interactions.
         tags: [evm, proxy, access-control]
 
   - id: L3
@@ -155,30 +185,37 @@ layers:
       - id: BTV-L3-001
         name: Bridge signature verification flaws
         description: forged, replayed or cross-domain-replayed validator signatures accepted
+        remediation: Use a vetted signature-verification library, enforce domain separation (chainId, nonce, deadline) in every signed message, and require a quorum of accountable, distinct signers.
         tags: [bridge, cryptography]
       - id: BTV-L3-002
         name: Validator/multisig key compromise
         description: quorum of bridge signer keys stolen or colluding
+        remediation: Hold bridge signer keys in hardware-backed wallets, rotate them on schedule with on-chain signer-set updates, monitor signing behavior for anomalies, and cap withdrawable value per signing period.
         tags: [bridge, key-management]
       - id: BTV-L3-003
         name: Cross-domain message replay
         description: messages valid on one chain/domain accepted on another
+        remediation: Bind every message to its source domain, nonce, and deadline, and keep a consumed-message registry on the destination so each valid message executes exactly once, on exactly one chain.
         tags: [bridge, replay]
       - id: BTV-L3-004
         name: Forged deposit or withdrawal proofs
         description: Merkle/IAVL/zero-knowledge proof verification accepts invalid proofs
+        remediation: Verify proofs against the correct roots and finality heights, use audited verifier contracts, and test verification against corpora of invalid and malformed proofs.
         tags: [bridge, proofs]
       - id: BTV-L3-005
         name: Trusted relayer takeover
         description: centralized or under-collateralized relayers can censor, reorder or fabricate messages
+        remediation: Decentralize or collateralize relayers, provide an escape-hatch withdrawal path that bypasses relayers entirely, and monitor relayer behavior for censorship or reordering.
         tags: [bridge, trust]
       - id: BTV-L3-006
         name: Misconfigured light client
         description: wrong genesis, stale validator set or unchecked finality on the destination
+        remediation: Validate genesis hash, validator-set updates, and finality proofs on the destination contract, and fail closed — halting message execution — on any mismatch rather than processing optimistically.
         tags: [bridge, light-client]
       - id: BTV-L3-007
         name: Cross-chain liquidity desync
         description: accounting between source and destination chains drifts, enabling over-issuance
+        remediation: Reconcile source and destination accounting per message, halt issuance automatically on mismatch beyond tolerance, and run continuous cross-chain balance audits with alerting.
         tags: [bridge, accounting]
 
   - id: L4
@@ -188,30 +225,37 @@ layers:
       - id: BTV-L4-001
         name: Oracle operator key compromise
         description: feed publishers or their keys compromised; price or data feeds manipulated
+        remediation: Publish from multisig or HSM-secured keys with scheduled rotation, and have consumers enforce staleness and deviation bounds so a compromised feed fails safe instead of propagating bad data.
         tags: [oracle, key-management]
       - id: BTV-L4-002
         name: Frontend supply-chain compromise
         description: drainer kits, compromised npm packages or hijacked CDN serving malicious UI
+        remediation: Pin dependencies with lockfiles and provenance-verified installs, serve CDN assets with Subresource Integrity, and monitor production bundles for unexpected changes.
         tags: [frontend, supply-chain]
       - id: BTV-L4-003
         name: Indexer/API authorization flaws
         description: graph, API or admin endpoints expose data or mutations without authz
+        remediation: Authenticate and authorize every endpoint with scoped tokens, keep admin and mutation APIs off public interfaces entirely, and audit API schemas for accidentally exposed resolvers.
         tags: [api, access-control]
       - id: BTV-L4-004
         name: Custodian or hot-wallet key management failure
         description: signer infrastructure (HSMs, MPC, multisig laptops) compromised
+        remediation: Move signing into HSMs or MPC with enforced policy controls and dual approval, segregate hot wallets with hard value caps, and monitor signing infrastructure for credential misuse.
         tags: [custody, key-management]
       - id: BTV-L4-005
         name: Subgraph/indexing logic errors
         description: incorrect indexing yields wrong balances or state to consumers that trust it
+        remediation: Property-test indexer logic against canonical chain state, reconcile indexed data with node queries on a schedule, and version subgraphs so consumers can pin known-good deployments.
         tags: [indexer]
       - id: BTV-L4-006
         name: DNS or BGP hijack
         description: domain or routing takeover redirects users to attacker infrastructure
+        remediation: Sign zones with DNSSEC, publish RPKI ROAs and monitor BGP announcements for your prefixes, and give users verifiable endpoints (allowlisted domains, certificate transparency monitoring).
         tags: [network, dns]
       - id: BTV-L4-007
         name: Web2 account takeover of privileged users
         description: email, social or SIM-swap compromise of deployers, maintainers or signers
+        remediation: Enforce hardware-key MFA on every privileged account, eliminate SMS-based second factors, and use dedicated isolated accounts for deployers, maintainers, and signers.
         tags: [social, accounts]
 
   - id: L5
@@ -221,32 +265,40 @@ layers:
       - id: BTV-L5-001
         name: Governance flash-loan vote seizure
         description: voting power borrowed to pass malicious proposals within one transaction
+        remediation: Use timelocked or vote-escrowed voting power, snapshot balances before the proposal window, and reject votes from balances acquired inside the voting period.
         tags: [governance, flash-loan]
       - id: BTV-L5-002
         name: Guardian/admin parameter abuse
         description: emergency or admin powers exceed their intended scope without timelock
+        remediation: Scope emergency powers to specific parameters, wrap every exercise in a timelock with a community veto window, and require multi-party approval for any change that can move funds.
         tags: [governance, access-control]
       - id: BTV-L5-003
         name: Low-liquidity venue price manipulation
         description: thin markets used as price references or exit liquidity
+        remediation: Never reference thin markets as price truth — use aggregated feeds weighted by venue depth — and cap trade or exit sizes relative to available liquidity.
         tags: [defi, market]
       - id: BTV-L5-004
         name: MEV sandwich attacks
         description: user trades extractable via ordering on public mempools
+        remediation: Offer private submission or batch-auction routing for user trades, set meaningful slippage bounds by default, and surface MEV-aware ordering options in the client UI.
         tags: [mev]
       - id: BTV-L5-005
         name: Restaking correlated-slashing risk
         description: shared security across AVS/services creates correlated failure modes
+        remediation: Cap restaked exposure per validator and per AVS, require operator and AVS diversification, and model correlated-slashing scenarios before adding new services.
         tags: [restaking, consensus]
       - id: BTV-L5-006
         name: Stablecoin peg attacks
         description: reflexivity and liquidity flight exploited to break or profit from depeg
+        remediation: Maintain over-collateralization buffers with automated depeg circuit breakers, and stress-test the redemption waterfall under bank-run conditions before relaxing any parameter.
         tags: [stablecoin, defi]
       - id: BTV-L5-007
         name: Airdrop and farming exploitation
         description: sybil attacks or reward-gaming drain incentive programs
+        remediation: Weight eligibility by proof-of-personhood or stake rather than raw address count, cap allocations per verified identity, and monitor distribution patterns for farming clusters.
         tags: [airdrop, sybil]
       - id: BTV-L5-008
         name: L2 sequencer censorship or withholding
         description: centralized sequencers reorder, censor or withhold transactions and forced-inclusion exits
+        remediation: Enable and regularly test forced-inclusion exit mechanisms, run independent sequencer-verification nodes, and publish liveness and withholding monitoring so users can detect censorship.
         tags: [l2, sequencer]

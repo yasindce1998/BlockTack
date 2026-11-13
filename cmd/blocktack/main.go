@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/blocktack/blocktack/internal/adapter"
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/correlate"
 	"github.com/blocktack/blocktack/internal/nodeaudit"
 	"github.com/blocktack/blocktack/internal/playbook"
 	"github.com/blocktack/blocktack/internal/recon"
@@ -65,6 +67,9 @@ Usage:
   blocktack campaign  --target FILE --playbook FILE   execute an attack playbook
   blocktack node-audit --target FILE [--module m]    L0/L1 node attack-surface audit
   blocktack report    --findings a.json,b.json        merge findings into a markdown report
+                      [--engagement]                  engagement-grade deliverable (exec
+                                                      summary, kill chains, remediation)
+                      [--target FILE] [--killchains FILE] engagement context (optional)
 
 Targets are YAML files (see examples/targets/). Every target must carry an
 authorization block; safe mode (default) additionally restricts endpoints to
@@ -242,6 +247,9 @@ func cmdReport(args []string) error {
 	findingsFlag := fs.String("findings", "", "comma-separated findings JSON files (required)")
 	out := fs.String("out", "report.md", "output markdown file")
 	title := fs.String("title", "BlockTack Assessment Report", "report title")
+	engagement := fs.Bool("engagement", false, "render an engagement-grade deliverable (executive summary, kill chains, remediation guidance)")
+	targetPath := fs.String("target", "", "path to target YAML (engagement mode: authorization and scope context)")
+	killchainsPath := fs.String("killchains", "", "path to killchains.json (engagement mode)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -249,6 +257,7 @@ func cmdReport(args []string) error {
 		return fmt.Errorf("--findings is required")
 	}
 	var all []core.Finding
+	var files []string
 	for _, path := range strings.Split(*findingsFlag, ",") {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -259,15 +268,93 @@ func cmdReport(args []string) error {
 			return err
 		}
 		all = append(all, fs...)
+		files = append(files, path)
 	}
 	f, err := os.Create(*out)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	if err := report.Markdown(f, all, *title); err != nil {
+	if !*engagement {
+		if err := report.Markdown(f, all, *title); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "wrote %s (%d findings)\n", *out, len(all))
+		return nil
+	}
+
+	// Engagement mode: pull authorization/scope context and kill chains.
+	var tgt *core.Target
+	if *targetPath != "" {
+		tgt, err = core.LoadTarget(*targetPath)
+		if err != nil {
+			return err
+		}
+	}
+	var chains []correlate.KillChain
+	if *killchainsPath != "" {
+		chains, err = loadKillChains(*killchainsPath)
+		if err != nil {
+			return err
+		}
+	}
+	titleSet := false
+	fs.Visit(func(fl *flag.Flag) {
+		if fl.Name == "title" {
+			titleSet = true
+		}
+	})
+	if !titleSet {
+		*title = "BlockTack Engagement Report"
+	}
+	opts := report.EngagementOptions{
+		Title:         *title,
+		ToolVersion:   version,
+		Target:        tgt,
+		TaxonomyPath:  core.DefaultTaxonomyPath(),
+		FindingsFiles: files,
+		SarifPath:     siblingSarif(files),
+	}
+	if err := report.EngagementMarkdown(f, all, chains, opts); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "wrote %s (%d findings)\n", *out, len(all))
+	chainMsg := ""
+	if len(chains) == 1 {
+		chainMsg = ", 1 kill chain"
+	} else if len(chains) > 1 {
+		chainMsg = fmt.Sprintf(", %d kill chains", len(chains))
+	}
+	fmt.Fprintf(os.Stderr, "wrote %s (%d findings%s)\n", *out, len(all), chainMsg)
 	return nil
+}
+
+// loadKillChains reads a killchains.json produced by a campaign run.
+func loadKillChains(path string) ([]correlate.KillChain, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read killchains: %w", err)
+	}
+	var chains []correlate.KillChain
+	if err := json.Unmarshal(data, &chains); err != nil {
+		return nil, fmt.Errorf("parse killchains %s: %w", path, err)
+	}
+	return chains, nil
+}
+
+// siblingSarif returns the findings.sarif that campaigns write next to a
+// findings.json, if one exists; empty string otherwise.
+func siblingSarif(files []string) string {
+	if len(files) == 0 || filepath.Ext(files[0]) != ".json" {
+		return ""
+	}
+	candidate := strings.TrimSuffix(files[0], ".json")
+	if filepath.Base(candidate) == "findings" {
+		candidate += ".sarif"
+	} else {
+		candidate = filepath.Join(filepath.Dir(files[0]), "findings.sarif")
+	}
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return ""
 }

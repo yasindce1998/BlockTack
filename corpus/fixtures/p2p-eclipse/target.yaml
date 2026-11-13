@@ -1,0 +1,20 @@
+# Target for the devp2p eclipse-execution campaign (L1).
+# The playbook boots one victim geth node (RPC on 127.0.0.1:8546,
+# p2p on 30304, maxpeers 12 → 8 inbound slots) and ten attacker geth
+# instances that fill every victim inbound peer slot.
+apiVersion: blocktack/v1
+name: p2p-eclipse
+chain:
+  type: evm
+  network: local
+  chainId: 31338
+endpoints:
+  - name: victim-geth-rpc
+    role: rpc
+    url: http://127.0.0.1:8546
+contracts: []
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet only
+  expires: "2027-12-31T00:00:00Z"

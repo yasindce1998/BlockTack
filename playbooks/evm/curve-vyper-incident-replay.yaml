@@ -74,6 +74,24 @@ steps:
           - "0x6Ec21d1868743a44318c3C259a6d4953F9978538" # attacker EOA
           - "0x9420F8821aB4609Ad9FA514f8D2F5344C3c0A6Ab" # attack contract
 
+  - id: simulate-sequence
+    name: Simulate the entire drain in revm before executing anything
+    tactic: exploit
+    precondition: in-memory execution against fork state — zero transactions broadcast, not even to the local chain
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: simulate-tx-sequence
+      options:
+        rawFiles:
+          - corpus/curve-vyper-2023/transactions/01_0xa84aa065ce61dbb1eb50ab6ae67fc31a9da50dd2c74eefd561661bfce2f1620c.raw
+          - corpus/curve-vyper-2023/transactions/02_0x11eb6fa7dfa0b93322bbd5573a31c0a4345a3a59ebe5cbe24e40ea61b494d162.raw
+          - corpus/curve-vyper-2023/transactions/03_0x1b6a42df803fba3c8c7bb1f8e18331247d3b0453320fdfbf2f376fbd4a057a22.raw
+        reports:
+          - token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" # WETH
+            account: "0x6Ec21d1868743a44318c3C259a6d4953F9978538" # attacker EOA
+            minProfit: "6000000000000000000000" # 6,000 WETH
+
   - id: replay-transactions
     name: Re-broadcast the attacker's 3 signed transactions in order
     tactic: exploit
