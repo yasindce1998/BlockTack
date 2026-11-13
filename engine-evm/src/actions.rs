@@ -2,8 +2,12 @@
 
 use crate::finding::Finding;
 use alloy::eips::BlockId;
-use alloy::primitives::{keccak256, Address, U256};
+use alloy::network::TransactionBuilder;
+use alloy::primitives::map::B256HashMap;
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::{DynProvider, Provider, ProviderBuilder};
+use alloy::rpc::types::eth::state::{AccountOverride, StateOverride};
+use alloy::rpc::types::TransactionRequest;
 
 /// Connect to an RPC endpoint and return a type-erased provider.
 pub async fn connect(rpc_url: &str) -> anyhow::Result<DynProvider> {
@@ -235,6 +239,154 @@ pub async fn verify_pnl(
     }
 }
 
+/// encode_calldata builds `selector || 32-byte big-endian words` for
+/// function signatures with uint256 arguments only (the common case for
+/// exploit parameters like borrow amounts).
+fn encode_calldata(signature: &str, uint_args: &[U256]) -> anyhow::Result<Vec<u8>> {
+    let sel = selector(signature);
+    let mut calldata = Vec::with_capacity(4 + 32 * uint_args.len());
+    calldata.extend_from_slice(&sel);
+    for arg in uint_args {
+        let word: [u8; 32] = arg.to_be_bytes();
+        calldata.extend_from_slice(&word);
+    }
+    Ok(calldata)
+}
+
+/// Parse a U256 from a decimal or 0x-hex string.
+fn parse_u256(raw: &str) -> anyhow::Result<U256> {
+    let raw = raw.trim();
+    if let Some(hex) = raw.strip_prefix("0x") {
+        Ok(U256::from_str_radix(hex, 16)?)
+    } else {
+        Ok(U256::from_str_radix(raw, 10)?)
+    }
+}
+
+/// simulate-call: execute a call against current chain state with storage
+/// overrides — "what would happen if this storage slot held X" — without
+/// broadcasting a transaction. This is how BlockTack verifies exploits
+/// that must never touch even a local chain.
+///
+/// options:
+///   to:        target contract address
+///   function:  signature, e.g. "borrow(uint256)" (uint256 args only)
+///   args:      list of uint256 args (decimal or 0x-hex strings)
+///   from:      optional sender address
+///   state:     {address: {slot: value}} storage overrides (decimal or
+///              0x-hex slots/values)
+pub async fn simulate_call(
+    rpc_url: &str,
+    options: &serde_json::Value,
+) -> anyhow::Result<Vec<Finding>> {
+    let to: Address = options
+        .get("to")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| anyhow::anyhow!("simulate-call requires options.to"))?
+        .parse()?;
+    let signature = options
+        .get("function")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| anyhow::anyhow!("simulate-call requires options.function"))?;
+    let uint_args: Vec<U256> = options
+        .get("args")
+        .and_then(serde_json::Value::as_array)
+        .map(|args| {
+            args.iter()
+                .filter_map(|a| a.as_str())
+                .map(parse_u256)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    let calldata = encode_calldata(signature, &uint_args)?;
+
+    let mut tx = TransactionRequest::default();
+    tx.set_to(to);
+    tx.set_input(alloy::primitives::Bytes::from(calldata.clone()));
+    if let Some(from) = options.get("from").and_then(serde_json::Value::as_str) {
+        tx.set_from(from.parse()?);
+    }
+    if let Some(value) = options
+        .get("value")
+        .and_then(serde_json::Value::as_str)
+        .map(parse_u256)
+        .transpose()?
+    {
+        tx.set_value(value);
+    }
+
+    // Storage overrides: {address: {slot: value}}.
+    let mut state_override = StateOverride::default();
+    if let Some(map) = options.get("state").and_then(serde_json::Value::as_object) {
+        for (addr_raw, slots) in map {
+            let addr: Address = addr_raw.parse()?;
+            let mut account = AccountOverride::default();
+            let mut state: B256HashMap<B256> = Default::default();
+            for (slot_raw, value_raw) in slots
+                .as_object()
+                .ok_or_else(|| anyhow::anyhow!("state slots must be an object"))?
+            {
+                let slot = B256::new(U256::from(parse_u256(slot_raw)?).to_be_bytes());
+                let value =
+                    B256::new(U256::from(parse_u256(value_raw.as_str().unwrap_or_default())?).to_be_bytes());
+                state.insert(slot, value);
+            }
+            account.state = Some(state);
+            state_override.insert(addr, account);
+        }
+    }
+
+    let provider = connect(rpc_url).await?;
+    let result = provider.call(tx).overrides(state_override).await;
+
+    let calldata_hex = format!("0x{}", hex(&calldata));
+    match result {
+        Ok(bytes) => Ok(vec![
+            Finding::new(
+                "engine-evm-simulate-call",
+                format!("Call succeeds in simulation: {signature}"),
+                "medium",
+            )
+            .with("confidence", "confirmed")
+            .with("layer", "L2")
+            .with(
+                "description",
+                format!(
+                    "eth_call with storage overrides returned successfully. The call path \
+                     works under the hypothesized state — the attack premise is confirmed \
+                     by simulation, no transaction was broadcast."
+                ),
+            )
+            .with(
+                "evidence",
+                format!("to={to} calldata={calldata_hex} result=0x{}", hex(&bytes)),
+            ),
+        ]),
+        Err(e) => Ok(vec![
+            Finding::new(
+                "engine-evm-simulate-call",
+                format!("Call reverts in simulation: {signature}"),
+                "info",
+            )
+            .with("confidence", "confirmed")
+            .with("layer", "L2")
+            .with(
+                "description",
+                "eth_call with storage overrides reverted — the hypothesized state does \
+                 not make this call path viable (or the call itself is not callable via \
+                 eth_call).",
+            )
+            .with("evidence", format!("to={to} calldata={calldata_hex} error={e}")),
+        ]),
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,5 +413,31 @@ mod tests {
     fn scan_ignores_clean_bytecode() {
         let code: Vec<u8> = vec![0x60, 0x01, 0x60, 0x02, 0x01, 0x00];
         assert!(scan_code(&code).is_empty());
+    }
+
+    #[test]
+    fn calldata_encoding_matches_reference() {
+        // Reference: `cast calldata "borrow(uint256)" 16000000000000000000`
+        let calldata = encode_calldata(
+            "borrow(uint256)",
+            &[U256::from(16_000_000_000_000_000_000u128)],
+        )
+        .unwrap();
+        assert_eq!(
+            hex(&calldata),
+            "c5ebeaec000000000000000000000000000000000000000000000000de0b6b3a76400000"
+        );
+    }
+
+    #[test]
+    fn u256_parsing_accepts_decimal_and_hex() {
+        assert_eq!(
+            parse_u256("16000000000000000000").unwrap(),
+            U256::from(16_000_000_000_000_000_000u128)
+        );
+        assert_eq!(
+            parse_u256("0xde0b6b3a76400000").unwrap(),
+            U256::from(16_000_000_000_000_000_000u128)
+        );
     }
 }

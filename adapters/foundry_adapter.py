@@ -52,14 +52,37 @@ def run(target: dict, options: dict) -> list:
     )
     build_errors = _parse_build(build.stdout)
     for err in build_errors[:20]:
-        findings.append({
-            "id": "foundry-build-error",
-            "title": "Build error in target sources",
-            "severity": "high",
-            "layer": "L2",
-            "source": "foundry",
-            "description": err.get("message", "compilation error")[:800],
-        })
+        message = err.get("message", "compilation error")[:800]
+        file_hint = ""
+        loc = err.get("sourceLocation") or {}
+        if loc.get("file"):
+            file_hint = f" ({loc['file']})"
+        if err.get("severity") == "error":
+            findings.append({
+                "id": "foundry-build-error",
+                "title": "Build error in target sources",
+                "severity": "high",
+                "layer": "L2",
+                "source": "foundry",
+                "description": message,
+            })
+        else:
+            # Compiler warnings. Solc 9302 (unused low-level call return
+            # value) is a genuine vulnerability signal: BTV-L2-005.
+            is_unchecked_call = "Return value of low-level calls not used" in message
+            findings.append({
+                "id": "foundry-build-warning",
+                "title": f"Compiler warning{file_hint}",
+                "severity": "medium" if is_unchecked_call else "low",
+                "layer": "L2",
+                "weakness": "BTV-L2-005" if is_unchecked_call else "",
+                "source": "foundry",
+                "description": message + (
+                    " Unchecked low-level calls are a classic reentrancy and "
+                    "silent-failure pattern (BTV-L2-005)."
+                    if is_unchecked_call else ""
+                ),
+            })
 
     # --- test ---
     test = subprocess.run(

