@@ -37,12 +37,13 @@
       state overrides (multi-transaction scenarios)
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
 - [x] Corpus goal: reproduce historical incidents end to end —
-      **10 exploits reproduced** (2 fixture classes + 6 Damn Vulnerable
-      DeFi challenges + 2 historical incidents replayed on mainnet
-      forks by raw-transaction rebroadcast: Euler 2023 and the original
-      Curve/Vyper pETH-pool drain). Next incidents: Ronin/Wormhole
-      (require non-EVM tooling), KyberSwap (multi-chain, mainnet
-      portion under assessment).
+      **11 exploits reproduced** (2 fixture classes + 6 Damn Vulnerable
+      DeFi challenges + 3 historical incidents replayed on mainnet
+      forks by raw-transaction rebroadcast: Euler 2023, the original
+      Curve/Vyper pETH-pool drain, and the KyberSwap mainnet
+      component). Next incidents: Ronin/Wormhole (require non-EVM
+      tooling), KyberSwap's L2 portions (require multi-chain
+      sandboxes).
 
 ## Phase 3 — L0/L1 node and consensus attacks
 

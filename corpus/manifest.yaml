@@ -98,8 +98,14 @@ exploits:  - id: ronin-bridge-2022
     layers: [L2]
     weakness: BTV-L2-011
     reference: https://rekt.news/kyberswap-rekt/
-    status: pending
-    notes: tick rounding/double-spend in concentrated liquidity
+    status: reproduced
+    notes: >-
+      Historical incident replayed by raw-transaction rebroadcast on a
+      mainnet fork (block 18630389): the Ethereum mainnet component
+      (~$7.5M) — deploy + 3 attack transactions against a dozen Elastic
+      pools — re-executes with zero divergence, all 11 profit-token
+      balances of the profit holder matching mainnet to the wei. The
+      ~$40M on other chains is out of scope. See corpus/kyberswap-2023/.
 
   - id: radiant-2024
     title: Radiant Capital signer compromise

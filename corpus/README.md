@@ -98,6 +98,11 @@ transactions touching mainnet.
   JPEG'd pETH/ETH pool (Vyper 0.2.15 broken reentrancy locks); profit
   of 6,106.751307562450092427 WETH — **exact to the wei** against the
   mainnet record, with gasUsed matching exactly.
+- **kyberswap-2023** (BTV-L2-011, ~$47M multi-chain / ~$7.5M mainnet):
+  fork at block 18630389, the attacker's deploy + 3 attack transactions
+  against a dozen KyberSwap Elastic pools (concentrated-liquidity tick
+  math); all **11 profit-token balances** match mainnet to the wei
+  (3,297 WETH · 72,978 USDC · 25,440 FRAX · 640,340 KNC · ...).
 
 ```sh
 bin/blocktack campaign \
@@ -107,4 +112,8 @@ bin/blocktack campaign \
 bin/blocktack campaign \
   --target corpus/curve-vyper-2023/target.yaml \
   --playbook playbooks/evm/curve-vyper-incident-replay.yaml
+
+bin/blocktack campaign \
+  --target corpus/kyberswap-2023/target.yaml \
+  --playbook playbooks/evm/kyberswap-incident-replay.yaml
 ```

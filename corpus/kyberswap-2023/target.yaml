@@ -1,0 +1,30 @@
+# KyberSwap Elastic mainnet-fork target for the 2023-11-22 incident replay.
+# The playbook forks mainnet at block 18630389 (EOA nonces 0-6 spent) on a
+# local anvil and re-broadcasts the attacker's signed historical
+# transactions (deploy + 3 attacks).
+apiVersion: blocktack/v1
+name: kyberswap-2023-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 1
+  fork:
+    enabled: true
+    base: https://eth.drpc.org
+    blockNumber: 18630389
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: kyberswap-attack-contract
+    address: "0xaf2acf3d4ab78e4c702256d214a3189a874cdc13"
+components:
+  - name: kyberswap-elastic-pools
+    kind: node
+    note: KyberSwap Elastic concentrated-liquidity pools (tick rounding bug)
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — read-only queries to public archive RPCs; transactions are broadcast only to the local fork
+  expires: "2027-12-31T00:00:00Z"
