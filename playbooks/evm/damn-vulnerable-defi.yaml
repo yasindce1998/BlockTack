@@ -30,6 +30,9 @@ steps:
           side-entrance: BTV-L2-001
           naive-receiver: BTV-L2-002
           puppet-v2: BTV-L2-003
+          compromised: BTV-L2-003
+          the-rewarder: BTV-L2-009
+          free-rider: BTV-L5-003
 
 verification:
   - id: three-pocs

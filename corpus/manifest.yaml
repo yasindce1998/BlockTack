@@ -145,3 +145,27 @@ wargames:
     reference: https://damnvulnerabledefi.xyz/challenges/puppet-v2/
     status: reproduced
     notes: lending pool prices collateral from Uniswap V2 spot reserves; dumping tokens crashes the oracle and the pool is borrowed for a fraction of its value
+
+  - id: dvd-compromised
+    title: Damn Vulnerable DeFi — Compromised
+    layers: [L2, L4]
+    weakness: BTV-L2-003
+    reference: https://damnvulnerabledefi.xyz/challenges/compromised/
+    status: reproduced
+    notes: two of three oracle sources' keys leaked (encoded in challenge docs); median price crashed to buy an NFT for 1 wei, then pumped to drain the exchange for 999 ETH
+
+  - id: dvd-the-rewarder
+    title: Damn Vulnerable DeFi — The Rewarder
+    layers: [L2]
+    weakness: BTV-L2-009
+    reference: https://damnvulnerabledefi.xyz/challenges/the-rewarder/
+    status: reproduced
+    notes: distributor's double-claim bitmap latches once per contiguous claim run, so one valid Merkle claim replays ~1700 times in a single call, draining both DVT and WETH distributions to dust
+
+  - id: dvd-free-rider
+    title: Damn Vulnerable DeFi — Free Rider
+    layers: [L2, L5]
+    weakness: BTV-L5-003
+    reference: https://damnvulnerabledefi.xyz/challenges/free-rider/
+    status: reproduced
+    notes: marketplace's buyMany pays once for all NFTs and refunds the price to the buyer (ownerOf checked after transfer); a Uniswap V2 flash swap supplies the 15 ETH stake — ~120 ETH extracted

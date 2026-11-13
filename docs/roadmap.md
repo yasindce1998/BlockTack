@@ -37,9 +37,9 @@
       state overrides (multi-transaction scenarios)
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
 - [ ] Corpus goal: reproduce historical incidents (Ronin, Euler, ...)
-      end to end — current count: **5 exploits reproduced** (2 fixture
-      classes + 3 Damn Vulnerable DeFi challenges: side-entrance,
-      naive-receiver, puppet-v2)
+      end to end — current count: **8 exploits reproduced** (2 fixture
+      classes + 6 Damn Vulnerable DeFi challenges: side-entrance,
+      naive-receiver, puppet-v2, compromised, the-rewarder, free-rider)
 
 ## Phase 3 — L0/L1 node and consensus attacks
 
