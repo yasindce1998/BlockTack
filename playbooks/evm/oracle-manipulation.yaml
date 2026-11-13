@@ -1,0 +1,76 @@
+# Emulates the Mango Markets / Euler class of economic exploits: borrow
+# capital via flash loan, skew a manipulable oracle, then extract value
+# from every position that trusts the skewed price.
+apiVersion: blocktack/v1
+kind: Playbook
+name: evm-oracle-manipulation
+description: >
+  Skew a spot-price oracle using flash-loaned capital, then drain lending
+  or derivative positions that depend on it. Targets BTV-L2-003 and
+  BTV-L2-006 (oracle manipulation, flash-loan-enabled drain).
+target:
+  chainTypes: [evm]
+  layers: [L2, L4]
+steps:
+  - id: env-up
+    name: Start forked EVM environment
+    tactic: setup
+    run:
+      type: shell
+      command: anvil
+      args: ["--fork-url", "${FORK_URL:-http://127.0.0.1:8545}", "--port", "8545"]
+      background: true
+
+  - id: map-oracles
+    name: Map oracle dependencies of target contracts
+    tactic: discover
+    precondition: target contracts deployed on the local/forked chain
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: map-oracles
+      options:
+        depth: 3
+
+  - id: static-pass
+    name: Static analysis of target sources
+    tactic: discover
+    run:
+      type: adapter
+      adapter: slither
+
+  - id: flashloan-skew
+    name: Acquire flash loan and skew oracle price
+    tactic: exploit
+    precondition: oracle reads a manipulable spot price (e.g. a Uniswap V2-style pool)
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: oracle-skew
+      options:
+        maxSlippageBps: 50
+
+  - id: drain-positions
+    name: Extract value from positions trusting the skewed oracle
+    tactic: exploit
+    run:
+      type: manual
+      note: >
+        Craft the second transaction of the attack — borrow against inflated
+        collateral, force liquidations, or exercise mispriced derivatives —
+        while the oracle remains skewed within the same block or manipulation
+        window.
+
+  - id: verify-pnl
+    name: Verify exploit profitability
+    tactic: verify
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: verify-pnl
+
+verification:
+  - id: profitable-drain
+    expects: attacker balance increases on the forked environment after gas
+  - id: finding-recorded
+    expects: a finding with weakness BTV-L2-003 at severity >= high is recorded

@@ -1,0 +1,33 @@
+# A local fork of Ethereum mainnet — replay real state without touching it.
+# Start one with:  anvil --fork-url https://eth.merkle.io
+#
+# Safe mode allows this because the endpoint we contact (anvil) is local;
+# the fork base host is only ever contacted by anvil, not by BlockTack.
+apiVersion: blocktack/v1
+name: eth-mainnet-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 1
+  fork:
+    enabled: true
+    base: https://eth.merkle.io
+    blockNumber: 0 # 0 = latest
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: example-protocol
+    address: "0x0000000000000000000000000000000000000000"
+    verified: true
+    sourceDir: corpus/damn-vulnerable-defi # replace with your target's sources
+components:
+  - name: example-oracle
+    kind: oracle
+    note: spot-price oracle read by the protocol
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — no transactions are broadcast to mainnet
+  expires: 2027-12-31T00:00:00Z
