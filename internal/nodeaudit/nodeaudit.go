@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/blocktack/blocktack/internal/core"
+	"github.com/blocktack/blocktack/internal/p2pattack"
 	"github.com/blocktack/blocktack/internal/webaudit"
 )
 
@@ -51,6 +52,8 @@ func runModule(ctx context.Context, module string, tgt *core.Target) ([]core.Fin
 		return mempoolAnalysis(ctx, tgt)
 	case "peer-analysis":
 		return peerAnalysis(ctx, tgt)
+	case "p2p-eclipse":
+		return p2pattack.Run(ctx, tgt)
 	case "web-audit":
 		return webaudit.Run(ctx, tgt)
 	default:

