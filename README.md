@@ -8,9 +8,10 @@ attack surface, orchestrates the best tooling per layer, executes attack
 playbooks against disposable local/forked environments, and turns results
 into verified findings.
 
-> **Status:** Phase 0/1 scaffold — data model, guardrails, CLI, recon,
-> adapter bridge, playbook runner, and engine pipeline are wired; the
-> EVM engine is a stub pending revm/alloy integration. See
+> **Status:** Phase 2 in progress — the first end-to-end campaign works:
+> boot a local chain, deploy a vulnerable fixture, discover its oracle
+> dependency from bytecode, execute the price-skew attack on-chain,
+> verify attacker profit, and cross-check with a forge PoC. See
 > [docs/roadmap.md](docs/roadmap.md).
 
 ## The attack surface
@@ -54,6 +55,11 @@ bin/blocktack recon --target examples/targets/local-anvil.yaml --out /tmp/findin
 bin/blocktack campaign \
   --target examples/targets/mainnet-fork.yaml \
   --playbook playbooks/evm/oracle-manipulation.yaml
+
+# Full end-to-end replay against a vulnerable fixture (requires Foundry):
+bin/blocktack campaign \
+  --target corpus/fixtures/naive-oracle-vault/target.yaml \
+  --playbook playbooks/evm/naive-oracle-vault.yaml
 
 # Merge findings into a report:
 bin/blocktack report --findings /tmp/findings.json --out report.md

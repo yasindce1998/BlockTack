@@ -55,6 +55,11 @@ Everything crossing a language or process boundary is JSON:
   evidence, PoC, source. Interchanged as JSON or SARIF 2.1.0.
 - **Playbook** (`playbooks/**/*.yaml`) — a declarative attack campaign:
   ordered steps of type `engine`, `adapter`, `shell`, or `manual`.
+  Shell steps receive `BLOCKTACK_OUT_DIR` in their environment, pointing
+  at the campaign output directory, so later steps can parse artifacts
+  of earlier ones (e.g. anvil's printed keys, `forge create` addresses).
+  Environment expansion is the shell's job — use `sh -c` for anything
+  dynamic.
 - **Job** (engine stdin) — `{"action", "options", "target"}`; the engine
   writes a JSON findings array to stdout.
 

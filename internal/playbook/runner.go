@@ -112,8 +112,12 @@ func (r *Runner) runShell(ctx context.Context, step Step, stepsDir string) error
 		return fmt.Errorf("shell step requires `command`")
 	}
 	logFile := filepath.Join(stepsDir, step.ID+".log")
-	cmd := exec.CommandContext(ctx, os.ExpandEnv(step.Run.Command), expandArgs(step.Run.Args)...)
-	cmd.Env = os.Environ()
+	// Environment expansion is left to the shell: step args are passed
+	// verbatim so `sh -c` scripts can define and use their own variables.
+	// BLOCKTACK_OUT_DIR is injected so steps can reference campaign
+	// artifacts (e.g. logs of earlier steps).
+	cmd := exec.CommandContext(ctx, step.Run.Command, step.Run.Args...)
+	cmd.Env = append(os.Environ(), "BLOCKTACK_OUT_DIR="+r.OutDir)
 
 	if step.Run.Background {
 		f, err := os.Create(logFile)
@@ -232,11 +236,7 @@ func enginePath(name string) string {
 }
 
 func expandArgs(args []string) []string {
-	out := make([]string, len(args))
-	for i, a := range args {
-		out[i] = os.ExpandEnv(a)
-	}
-	return out
+	return args // expansion is the shell's job; kept for API stability
 }
 
 var sanitizeRe = regexp.MustCompile(`[^a-z0-9-]+`)

