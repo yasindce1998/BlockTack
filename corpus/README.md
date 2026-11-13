@@ -93,9 +93,18 @@ transactions touching mainnet.
   ~8k ETH profit verified against the on-chain record within 0.1%.
   Provenance of the vendored raw transactions is re-verifiable with
   `corpus/euler-2023/fetch-raw-txs.sh`.
+- **curve-vyper-2023** (BTV-L2-012, ~$70M incident / ~$11M this replay):
+  fork at block 17806055, the original attacker's 3-tx drain of the
+  JPEG'd pETH/ETH pool (Vyper 0.2.15 broken reentrancy locks); profit
+  of 6,106.751307562450092427 WETH — **exact to the wei** against the
+  mainnet record, with gasUsed matching exactly.
 
 ```sh
 bin/blocktack campaign \
   --target corpus/euler-2023/target.yaml \
   --playbook playbooks/evm/euler-incident-replay.yaml
+
+bin/blocktack campaign \
+  --target corpus/curve-vyper-2023/target.yaml \
+  --playbook playbooks/evm/curve-vyper-incident-replay.yaml
 ```

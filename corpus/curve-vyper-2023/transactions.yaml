@@ -1,0 +1,20 @@
+# Ordered attacker transactions for the Curve/Vyper (JPEGd pETH/ETH)
+# incident replay. The provenance script (fetch-raw-txs.sh) re-fetches
+# each raw tx from a public RPC to verify the vendored bytes.
+apiVersion: blocktack/curve-vyper-2023/v1
+forkBlock: 17806055 # state after this block: attacker EOA nonce 167, attack contract deployed
+attackBlock: 17806056 # exploit tx was mainnet block 17806056, index 0
+attackers:
+  eoa: "0x6Ec21d1868743a44318c3C259a6d4953F9978538"
+  attackContract: "0x9420F8821aB4609Ad9FA514f8D2F5344C3c0A6Ab"
+victimPool: "0x9848482da3ee3076165ce6497eda906e66bb85c5" # JPEGd pETH/ETH pool, Vyper 0.2.15
+transactions:
+  - order: 1
+    hash: "0xa84aa065ce61dbb1eb50ab6ae67fc31a9da50dd2c74eefd561661bfce2f1620c"
+    description: "ATTACK: 80k WETH Balancer flash loan + reentrancy drain of the broken pool (6,106.75 WETH profit)"
+  - order: 2
+    hash: "0x11eb6fa7dfa0b93322bbd5573a31c0a4345a3a59ebe5cbe24e40ea61b494d162"
+    description: "follow-up call against the drained pool (near no-op; needed for nonce continuity)"
+  - order: 3
+    hash: "0x1b6a42df803fba3c8c7bb1f8e18331247d3b0453320fdfbf2f376fbd4a057a22"
+    description: "sweep of the full profit to the attacker EOA"

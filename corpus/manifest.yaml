@@ -74,8 +74,14 @@ exploits:  - id: ronin-bridge-2022
     layers: [L2]
     weakness: BTV-L2-012
     reference: https://rekt.news/curve-vyper-rekt/
-    status: pending
-    notes: broken reentrancy locks in specific Vyper versions
+    status: reproduced
+    notes: >-
+      Historical incident replayed by raw-transaction rebroadcast on a
+      mainnet fork (block 17806055): the original attacker's 3-tx drain
+      of the JPEG'd pETH/ETH pool (Vyper 0.2.15 broken reentrancy locks)
+      re-executes with gasUsed matching mainnet exactly, netting
+      6,106.751307562450092427 WETH — exact to the wei. See
+      corpus/curve-vyper-2023/.
 
   - id: multichain-2023
     title: Multichain key management failure

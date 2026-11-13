@@ -133,10 +133,16 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .and_then(Value::as_array)
                 .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
                 .unwrap_or_default();
+            let min_profit = job
+                .options
+                .get("minProfit")
+                .and_then(Value::as_str)
+                .map(actions::parse_u256);
             async {
                 let token = token
                     .ok_or_else(|| anyhow::anyhow!("erc20-balance requires options.token"))?;
-                actions::erc20_balance(&url, &token, &accounts).await
+                let min_profit = min_profit.transpose()?;
+                actions::erc20_balance(&url, &token, &accounts, min_profit).await
             }
             .await
         }

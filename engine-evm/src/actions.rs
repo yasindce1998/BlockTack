@@ -254,7 +254,7 @@ fn encode_calldata(signature: &str, uint_args: &[U256]) -> anyhow::Result<Vec<u8
 }
 
 /// Parse a U256 from a decimal or 0x-hex string.
-fn parse_u256(raw: &str) -> anyhow::Result<U256> {
+pub fn parse_u256(raw: &str) -> anyhow::Result<U256> {
     let raw = raw.trim();
     if let Some(hex) = raw.strip_prefix("0x") {
         Ok(U256::from_str_radix(hex, 16)?)
@@ -503,12 +503,15 @@ pub async fn oracle_staleness(
 /// used for token profit verification in incident replays.
 ///
 /// options:
-///   token:    ERC-20 address
-///   accounts: list of account addresses
+///   token:     ERC-20 address
+///   accounts:  list of account addresses
+///   minProfit: optional decimal threshold; a balance at or above it is
+///              reported as a critical confirmed profit finding
 pub async fn erc20_balance(
     rpc_url: &str,
     token: &str,
     accounts: &[String],
+    min_profit: Option<U256>,
 ) -> anyhow::Result<Vec<Finding>> {
     let token: Address = token
         .parse()
@@ -534,19 +537,39 @@ pub async fn erc20_balance(
         match result {
             Ok(res) if res.len() >= 32 => {
                 let balance = U256::from_be_bytes::<32>(res[..32].try_into().unwrap());
-                findings.push(
-                    Finding::new(
+                let is_profit = min_profit.map_or(false, |min| balance >= min);
+                let (id, title, severity) = if is_profit {
+                    (
+                        "engine-evm-erc20-profit",
+                        format!("Token profit verified: {raw}"),
+                        "critical",
+                    )
+                } else {
+                    (
                         "engine-evm-erc20-balance",
                         format!("ERC-20 balance: {raw}"),
                         "info",
                     )
-                    .with("confidence", "confirmed")
-                    .with("layer", "L5")
-                    .with("target", raw.clone())
-                    .with(
-                        "evidence",
-                        format!("token={token} account={raw} balance={balance}"),
-                    ),
+                };
+                findings.push(
+                    Finding::new(id, title, severity)
+                        .with("confidence", "confirmed")
+                        .with("layer", "L5")
+                        .with("target", raw.clone())
+                        .with(
+                            "description",
+                            if is_profit {
+                                "The account's token balance reached the declared profit \
+                                 threshold — the replay's economic objective was achieved."
+                                    .to_string()
+                            } else {
+                                String::new()
+                            },
+                        )
+                        .with(
+                            "evidence",
+                            format!("token={token} account={raw} balance={balance}"),
+                        ),
                 );
             }
             Ok(_) => findings.push(
