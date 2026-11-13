@@ -1,0 +1,10 @@
+[package]
+name = "blocktack-solana"
+version = "0.1.0"
+edition = "2021"
+description = "BlockTack Solana attack engine: chain-facing actions against Solana nodes"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["blocking", "json"] }

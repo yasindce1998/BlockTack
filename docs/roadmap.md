@@ -88,7 +88,14 @@
 
 ## Phase 6 — Non-EVM expansion
 
-- [ ] `engine-solana` (Trident integration, BPF analysis)
+- [x] `engine-solana` (Rust): speaks the same job/findings contract as
+      engine-evm via Solana JSON-RPC — `fingerprint` (getVersion,
+      getEpochInfo) and `balance` (getBalance, lamports) actions,
+      verified live against public devnet; smoke playbook
+      `playbooks/solana/devnet-fingerprint.yaml`
+- [x] Engine resolution generalized: binaries resolve to
+      `engine-<chain>/target/release/` by name
+- [ ] Solana program analysis (Trident integration, BPF bytecode)
 - [ ] Move chains (Move Prover integration)
 - [ ] CosmWasm + Cosmos SDK state-machine fuzzing (Go)
 - [ ] Permissioned chains (Besu, Fabric)

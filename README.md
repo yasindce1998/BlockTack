@@ -31,7 +31,9 @@ Browse the machine-readable weakness taxonomy with `blocktack matrix`.
 
 Go orchestrates, Rust computes, Python glues to the existing analysis
 ecosystem (Slither et al.). Everything crosses process boundaries as JSON
-or SARIF. See [docs/architecture.md](docs/architecture.md).
+or SARIF. Chain-specific engines live in `engine-<chain>/` and speak the
+same job/findings contract (`engine-evm`, `engine-solana`). See
+[docs/architecture.md](docs/architecture.md).
 
 ```
 blocktack CLI (Go) ── recon · scan · campaign · report
@@ -88,8 +90,9 @@ internal/recon/      L0/L1 endpoint probing (Go)
 internal/adapter/    adapter bridge to Python/SARIF tools (Go)
 internal/playbook/   playbook schema + campaign runner (Go)
 internal/report/     report rendering (Go)
-adapters/            Python adapters (Slither, ...)
-engine-evm/          EVM attack engine (Rust)
+adapters/            Python adapters (Slither, Foundry, ...)
+engine-evm/          EVM attack engine (Rust, alloy)
+engine-solana/       Solana attack engine (Rust, JSON-RPC)
 taxonomy/            the weakness matrix (YAML)
 playbooks/           attack playbooks (YAML)
 corpus/              known-exploits regression set
