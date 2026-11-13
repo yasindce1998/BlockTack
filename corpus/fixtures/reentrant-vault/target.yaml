@@ -1,0 +1,22 @@
+# Target for the reentrant-vault corpus fixture (BTV-L2-001).
+# The playbook boots anvil on 127.0.0.1:8545 and deploys this fixture
+# before attacking it.
+apiVersion: blocktack/v1
+name: reentrant-vault
+chain:
+  type: evm
+  network: local
+  chainId: 31337
+endpoints:
+  - name: anvil-rpc
+    role: rpc
+    url: http://127.0.0.1:8545
+contracts:
+  - name: ReentrantVault
+    address: "0x5FbDB2315678afecb367f032d93F642f64180aa3" # deterministic when deployed by playbook
+    sourceDir: corpus/fixtures/reentrant-vault
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local testnet fixture only
+  expires: "2027-12-31T00:00:00Z"

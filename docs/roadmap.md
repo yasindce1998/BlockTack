@@ -20,18 +20,24 @@
 
 ## Phase 2 — Adversarial execution environment (in progress)
 
-- [x] alloy integration in `engine-evm` with three real actions:
+- [x] alloy integration in `engine-evm` with four real actions:
       `fingerprint` (chain identity), `map-oracles` (bytecode selector
       scan for oracle dependencies, keccak-verified selectors),
-      `verify-pnl` (balance-delta profit verification)
+      `verify-pnl` (balance-delta profit verification), `simulate-call`
+      (eth_call with storage overrides + value — attack premises
+      verified without broadcasting transactions)
 - [x] First end-to-end campaign: boot anvil → deploy fixture → map
-      oracles from bytecode → execute price-skew attack on-chain via
-      cast → verify attacker profit → cross-check with forge PoC
-      (`playbooks/evm/naive-oracle-vault.yaml`)
-- [ ] revm integration: state overrides and block-level simulation for
-      attacks that must not touch even a local chain
+      oracles from bytecode → simulate the attack → execute price-skew
+      on-chain via cast → verify attacker profit → cross-check with
+      forge PoC (`playbooks/evm/naive-oracle-vault.yaml`)
+- [x] Second end-to-end campaign: reentrancy drain fully simulated via
+      eth_call (reentrancy executes in simulation) then executed
+      on-chain (`playbooks/evm/reentrant-vault.yaml`)
+- [ ] revm integration: full block-level simulation beyond eth_call
+      state overrides (multi-transaction scenarios)
 - [ ] Local multi-client testnet orchestration (wrap Kurtosis)
-- [ ] Corpus goal: reproduce 5 historical exploits end to end
+- [ ] Corpus goal: reproduce 5 historical exploits end to end (2
+      fixture classes done)
 
 ## Phase 3 — L0/L1 node and consensus attacks
 

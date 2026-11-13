@@ -121,8 +121,8 @@ async fn dispatch(job: Job) -> Vec<Finding> {
             actions::map_oracles(provider, &collect_addresses(&job)).await
         }
         .await,
-        "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {
-            Some(attacker) => {
+        "simulate-call" => actions::simulate_call(&url, &job.options).await,
+        "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {            Some(attacker) => {
                 let blocks_ago = job
                     .options
                     .get("blocksAgo")
