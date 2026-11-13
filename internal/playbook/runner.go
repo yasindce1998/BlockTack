@@ -291,7 +291,9 @@ func enginePath(name string) string {
 	if dir := os.Getenv("BLOCKTACK_ENGINES"); dir != "" {
 		return filepath.Join(dir, name)
 	}
-	return filepath.Join(core.RepoRoot(), "engine-evm", "target", "release", name)
+	// Binary "blocktack-evm" lives in engine-evm/target/release/, etc.
+	dir := "engine-" + strings.TrimPrefix(name, "blocktack-")
+	return filepath.Join(core.RepoRoot(), dir, "target", "release", name)
 }
 
 func expandArgs(args []string) []string {

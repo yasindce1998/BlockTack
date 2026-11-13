@@ -1,0 +1,41 @@
+# Solana engine smoke campaign: fingerprint a Solana node (devnet by
+# default via the example target) and track a well-known account's
+# balance. Establishes the engine pipeline for non-EVM chains.
+#
+# Run from the repo root:
+#   bin/blocktack campaign \
+#     --target examples/targets/solana-devnet.yaml \
+#     --playbook playbooks/solana/devnet-fingerprint.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: solana-devnet-fingerprint
+description: >
+  Read-only Solana recon: node version, epoch/slot state, and account
+  balance via the blocktack-solana engine. Scope is limited to identity
+  queries against a public testnet RPC.
+target:
+  chainTypes: [solana]
+  layers: [L1]
+steps:
+  - id: fingerprint
+    name: Fingerprint the Solana node
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-solana
+      action: fingerprint
+
+  - id: balance
+    name: Track the balance of a known account
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-solana
+      action: balance
+      options:
+        # Solana docs example account (from the JSON-RPC documentation).
+        account: "83astBRguLMdt2h5U1Tpdq5tjFoJ6noeGwaY3mDLVcri"
+
+verification:
+  - id: node-fingerprinted
+    expects: fingerprint reports the node's solana-core version and epoch state

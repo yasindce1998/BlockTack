@@ -9,9 +9,12 @@ go-build:
 
 engine:
 	cargo build --release --manifest-path engine-evm/Cargo.toml
+	cargo build --release --manifest-path engine-solana/Cargo.toml
 
 test:
 	go test ./...
+	cargo test --release --manifest-path engine-evm/Cargo.toml
+	cargo test --release --manifest-path engine-solana/Cargo.toml
 
 vet:
 	go vet ./...

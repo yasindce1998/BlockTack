@@ -1,0 +1,21 @@
+# Solana devnet target — read-only identity probes of a public testnet
+# RPC. The authorization block scopes exactly that: no transactions, no
+# state mutation. Safe mode allows the host because it is listed in
+# authorization.liveTargets.
+apiVersion: blocktack/v1
+name: solana-devnet
+chain:
+  type: solana
+  network: testnet
+endpoints:
+  - name: devnet-rpc
+    role: rpc
+    url: https://api.devnet.solana.com
+contracts: []
+authorization:
+  declared: true
+  authorizedBy: public endpoint — read-only probes
+  scope: read-only identity and balance queries against public devnet RPC; no transactions
+  expires: "2027-12-31T00:00:00Z"
+  liveTargets:
+    - api.devnet.solana.com
