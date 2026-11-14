@@ -107,6 +107,27 @@ exploits:  - id: ronin-bridge-2022
       balances of the profit holder matching mainnet to the wei. The
       ~$40M on other chains is out of scope. See corpus/kyberswap-2023/.
 
+  - id: kyberswap-arbitrum-2023
+    title: KyberSwap Elastic liquidity math exploit (Arbitrum One)
+    year: 2023
+    layers: [L2]
+    weakness: BTV-L2-011
+    reference: https://rekt.news/kyberswap-rekt/
+    status: reproduced
+    notes: >-
+      Historical incident replayed by raw-transaction rebroadcast on an
+      Arbitrum One fork (block 153081940): the largest single-chain
+      chunk (~$20M+) — 12 attacker transactions (2 deploys + 10 attack
+      batches) re-execute with status=1 and identical hashes; 13/15
+      profit tokens match the on-chain record to the raw unit, WETH/
+      WBTC slightly above it because ~130 competing arbitrage txs are
+      excluded from single-actor replay (evidence in
+      corpus/kyberswap-arbitrum-2023/). The ~$7.5M Ethereum mainnet
+      component is covered by the kyberswap-2023 entry. Validated
+      end-to-end twice (2026-11-14); WETH varies ~±1 WETH between runs
+      because automine block timestamps differ from the historical ones
+      (Elastic fee math is timestamp-sensitive).
+
   - id: radiant-2024
     title: Radiant Capital signer compromise
     year: 2024

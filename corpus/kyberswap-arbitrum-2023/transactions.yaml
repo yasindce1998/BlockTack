@@ -1,0 +1,69 @@
+# Ordered attacker transactions for the KyberSwap Elastic (Arbitrum One)
+# incident replay — the L2 component of the 2023-11-22 multi-chain
+# exploit (~$20M+ on Arbitrum, the largest single-chain chunk). The
+# provenance script (fetch-raw-txs.sh) reconstructs each raw tx from the
+# on-chain tx objects served by arb1.arbitrum.io/rpc and verifies the
+# vendored bytes by keccak256.
+apiVersion: blocktack/kyberswap-arbitrum-2023/v1
+forkBlock: 153081940 # 2023-11-22 22:56 UTC, 8 blocks pre-deployment: EOA at nonce 0, balance 2 ETH, pools pre-attack
+attackBlocks: 153081948-153085624
+attackers:
+  eoa: "0x50275e0b7261559ce1644014d4b78d4aa63be836" # same EOA as the mainnet replay; nonces 0-11 here
+  attackContract1: "0xe84e1e5b778a6beb9b95415118296bdbb62fadf1" # CREATE at nonce 0
+  attackContract2: "0x5e5c2dba2f2c6c7a0603532e6167a70a2ee2b5ae" # CREATE at nonce 6
+  profitHolder: "0xc9b826bad20872eb29f9b1d8af4befe8460b50c6" # receives all proceeds (same as mainnet)
+transactions:
+  - order: 0
+    hash: "0xbcf977d288ccc3c61db97b7af3fb81eb2cd8e76f348da88d5dc522151829b940"
+    block: 153081948
+    description: "attack-contract-1 deployment (CREATE, EOA nonce 0)"
+  - order: 1
+    hash: "0xcea8599b8b82d5c17739fda9fe69a3e19a1613405929b3e191118681b702fc6a"
+    block: 153081978
+    description: "attack batch A via contract 1 (Balancer flash loan + Elastic pools)"
+  - order: 2
+    hash: "0x986e1683edea5d1c21a64ee6836d487c611274674947979023a433afaafaf7d0"
+    block: 153082012
+    description: "attack batch B"
+  - order: 3
+    hash: "0x339a65bb935f69e584ea979aa39282414371767576d4f1186a047768ef0a57c5"
+    block: 153082044
+    description: "attack batch C"
+  - order: 4
+    hash: "0x567f0ba7741d097b6b1aaba68e8b75b9930f3cf946681cf9ad068aa34eb11c5b"
+    block: 153082076
+    description: "attack batch D"
+  - order: 5
+    hash: "0x0106c7549ac4e0de16aefce2b8fe339127ee8003b236f623d05edc41429de779"
+    block: 153082115
+    description: "attack batch E"
+  - order: 6
+    hash: "0x825c47e942c5dd9c1c8a95383eecccaab26fac954f4a974fb98cebc5f7b42095"
+    block: 153085484
+    description: "attack-contract-2 deployment (CREATE, EOA nonce 6)"
+  - order: 7
+    hash: "0xa514ee9caee3e5273ceb607478407eb87a246653fd4184307cd203f191d4b624"
+    block: 153085507
+    description: "attack batch F via contract 2"
+  - order: 8
+    hash: "0x8464ee4eab7e10c9c07aee4637644708cd0ce43a7265f481eac2dfb0dbab942c"
+    block: 153085522
+    description: "attack batch G"
+  - order: 9
+    hash: "0x9052ae9f65cda52a578c334aa94d2582ba51e063b122fb28b0e2b1718b98e3a4"
+    block: 153085546
+    description: "attack batch H"
+  - order: 10
+    hash: "0x4f1de9f619ec512da481d8a550377c6c7f02eecdb7af0026717c702a23cebc20"
+    block: 153085617
+    description: "attack batch I"
+  - order: 11
+    hash: "0x1b2f1aff367844f9d940cce16b71949dee8a3039abd94120ad3678697e134906"
+    block: 153085624
+    description: "attack batch J"
+postExploit:
+  # Nonces 12-14 (fund shuffling, Nov 23 / Dec 1) are documented but not
+  # part of the replay — they post-date all profit realization:
+  - hash: "0xc15d2ecff75cc6ecc28af6d24df382224620ac47d473a1424eb49fbf97d465db" # nonce 12, 0.1 ETH out
+  - hash: "0x7d5be89c0befde9bbae3ea2d75fecf8cd42bf9b6b92a26d1db93a273d6f1a581" # nonce 13, 1 ETH to profit holder
+  - hash: "0x62a4861a5fada514ec8307390924748b05bf7097e02c1e81d558a2c5454a0c63" # nonce 14, ~0.874 ETH out

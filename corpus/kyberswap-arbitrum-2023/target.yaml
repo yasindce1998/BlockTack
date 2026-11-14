@@ -1,0 +1,43 @@
+# KyberSwap Elastic Arbitrum One mainnet-fork target for the 2023-11-22
+# incident replay. The playbook forks Arbitrum One at block 153081940
+# (8 blocks before the attacker's deployment: EOA at nonce 0 with its
+# historical 2 ETH balance, pools pre-attack) on a local anvil and
+# re-broadcasts the attacker's 12 signed historical transactions
+# (2 deploys + 10 attack batches). Zero transactions ever touch
+# Arbitrum One.
+#
+# NOTE ON THE FORK RPC: archive state for Nov-2023 Arbitrum is served by
+# https://arbitrum-one-public.nodies.app, but a fresh anvil fork makes
+# ~4,100 lazy state fetches and public-tier rate limits make direct
+# forking unreliable. corpus/kyberswap-arbitrum-2023/rpc_proxy.py paces
+# requests and disk-caches deterministic state calls, so the first run
+# is slow (minutes; single txs up to ~15 min cold) and warm restarts are
+# cheap. The playbook starts the proxy automatically.
+apiVersion: blocktack/v1
+name: kyberswap-arbitrum-2023-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 42161
+  fork:
+    enabled: true
+    base: https://arbitrum-one-public.nodies.app
+    blockNumber: 153081940
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8558
+contracts:
+  - name: kyberswap-attack-contract-1
+    address: "0xe84e1e5b778a6beb9b95415118296bdbb62fadf1"
+  - name: kyberswap-attack-contract-2
+    address: "0x5e5c2dba2f2c6c7a0603532e6167a70a2ee2b5ae"
+components:
+  - name: kyberswap-elastic-pools-arbitrum
+    kind: node
+    note: KyberSwap Elastic concentrated-liquidity pools on Arbitrum One (tick rounding bug, BTV-L2-011)
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — read-only queries to public archive RPCs; transactions are broadcast only to the local fork
+  expires: "2027-12-31T00:00:00Z"

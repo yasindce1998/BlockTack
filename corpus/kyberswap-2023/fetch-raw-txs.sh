@@ -11,9 +11,17 @@ DIR="$(cd "$(dirname "$0")" && pwd)/transactions"
 fail=0
 for f in "$DIR"/*.raw; do
     name="$(basename "$f")"
-    hash="0x$(echo "$name" | cut -d_ -f2)"
+    h="${name#*_}"        # strip "NN_" order prefix
+    hash="${h%.raw}"      # strip ".raw" suffix -> "0x..."
     vendored="$(tr -d '[:space:]' < "$f")"
     fetched="$(cast rpc eth_getRawTransactionByHash "$hash" --rpc-url "$RPC" | tr -d '"' | tr -d '[:space:]')"
+    # Guard against RPCs that serve non-canonical serializations: a
+    # fetched raw is only accepted if keccak256(raw) == tx hash.
+    if [ -n "$fetched" ] && [ "$(cast keccak "$fetched")" != "$hash" ]; then
+        echo "NONCANONICAL $name (fetched bytes do not hash to $hash)"
+        fail=1
+        continue
+    fi
     if [ "$vendored" = "$fetched" ]; then
         echo "OK   $name"
     else
