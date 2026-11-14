@@ -7,7 +7,7 @@
 - [x] Finding model with SARIF 2.1.0 interchange
 - [x] Known-exploits regression corpus manifest (`corpus/manifest.yaml`)
 
-## Phase 1 — Platform skeleton + EVM MVP (current)
+## Phase 1 — Platform skeleton + EVM MVP ✅
 
 - [x] Go orchestrator CLI: `matrix`, `recon`, `scan`, `campaign`, `report`
 - [x] Functional L0/L1 recon (RPC identity + privileged namespace probing)
@@ -18,7 +18,7 @@
 - [ ] Echidna/Medusa adapter (property-based fuzzing)
 - [x] Wire a corpus fixture replay end to end (`corpus/fixtures/naive-oracle-vault`)
 
-## Phase 2 — Adversarial execution environment (in progress)
+## Phase 2 — Adversarial execution environment ✅ (Kurtosis orchestration open)
 
 - [x] alloy integration in `engine-evm` with four real actions:
       `fingerprint` (chain identity), `map-oracles` (bytecode selector
@@ -81,7 +81,8 @@
       missing hardening headers, directory listings, committed `.env`/
       `.git`/pprof/GraphQL exposure) against api/indexer/frontend
       endpoints (BTV-L4-002/003); replayable via
-      `playbooks/evm/off-chain-attack-surface.yaml`- [ ] Bridge model checkers (signature verification, replay domains)
+      `playbooks/evm/off-chain-attack-surface.yaml`
+- [ ] Bridge model checkers (signature verification, replay domains)
 - [ ] Relayer/light-client misconfiguration modules
 - [ ] Cross-chain message replay campaigns on multi-chain sandboxes
 
