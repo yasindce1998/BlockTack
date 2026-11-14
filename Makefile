@@ -45,5 +45,5 @@ release: engine
 	cp -r taxonomy playbooks corpus examples dist/blocktack-$(VERSION)-linux-amd64/
 	cp README.md LICENSE dist/blocktack-$(VERSION)-linux-amd64/ 2>/dev/null || true
 	tar -czf dist/blocktack-$(VERSION)-linux-amd64.tar.gz -C dist blocktack-$(VERSION)-linux-amd64
-	cd dist && sha256sum blocktack-* > sha256sums.txt
+	cd dist && sha256sum blocktack-linux-amd64 blocktack-darwin-* blocktack-windows-* blocktack-$(VERSION)-*.tar.gz blocktack-evm blocktack-solana > sha256sums.txt
 	@echo "release artifacts in dist/"
