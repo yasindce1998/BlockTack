@@ -70,12 +70,42 @@ func TestCVEDBLoadsAndMatchesGeth(t *testing.T) {
 			t.Errorf("Geth/v1.10.7 should be vulnerable to %s (fixed in %s)", v.ID, v.FixedIn)
 		}
 	}
-	// A post-fix version must not.
-	parsed = extractVersion("Geth/v1.13.4-stable/linux-amd64/go1.21")
+	// A fully up-to-date version must not be flagged by anything.
+	// (1.13.4 IS flagged: it is below the 1.13.15 fix for CVE-2024-32972.)
+	parsed = extractVersion("Geth/v1.17.10-stable/linux-amd64/go1.27")
 	for _, v := range geth.Vulnerabilities {
 		if versionLess(parsed, parseFixedIn(v.FixedIn)) {
-			t.Errorf("Geth/v1.13.4 should not be vulnerable to %s", v.ID)
+			t.Errorf("Geth/v1.17.10 should not be vulnerable to %s", v.ID)
 		}
+	}
+	// Calendar versioning must compare numerically, not lexically:
+	// Besu 26.10.0 > 26.8.1 as strings would sort "10" < "8".
+	besu26_10 := extractVersion("besu/v26.10.0/linux-x86_64/temurin")
+	if versionLess(besu26_10, parseFixedIn("26.8.1")) {
+		t.Error("besu 26.10.0 should not be < 26.8.1 (lexical compare bug)")
+	}
+	besu26_7 := extractVersion("besu/v26.7.0/linux-x86_64/temurin")
+	if !versionLess(besu26_7, parseFixedIn("26.8.1")) {
+		t.Error("besu 26.7.0 should be < 26.8.1")
+	}
+	// Every client in the DB must carry at least one verified entry,
+	// and every entry needs the fields findings render.
+	for _, c := range db.Clients {
+		if len(c.Vulnerabilities) == 0 {
+			t.Errorf("client %s has no vulnerabilities", c.Name)
+		}
+		for _, v := range c.Vulnerabilities {
+			if v.ID == "" || v.FixedIn == "" || v.Reference == "" || v.Layer == "" || v.Weakness == "" {
+				t.Errorf("client %s entry %s missing required fields", c.Name, v.ID)
+			}
+		}
+	}
+	// Nethermind and Besu build-metadata / suffix formats must parse.
+	if v := extractVersion("Nethermind/v1.25.3+abc123"); v == nil || versionLess(v, parseFixedIn("1.25.2")) {
+		t.Errorf("Nethermind/v1.25.3+abc123 should parse to >= 1.25.2, got %v", v)
+	}
+	if v := extractVersion("erigon/v2.60.0/linux-amd64"); v == nil || !versionLess(v, parseFixedIn("3.4.0")) {
+		t.Errorf("erigon/v2.60.0 should parse to < 3.4.0, got %v", v)
 	}
 }
 

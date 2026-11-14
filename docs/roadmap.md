@@ -69,7 +69,11 @@
       admin_peers concentration verifies the eclipse state — critical
       confirmed finding (BTV-L1-002)
 - [ ] Timejacking / clock-skew modules
-- [ ] Full client CVE database (the seed ships one verified entry)
+- [x] Client CVE database populated: 18 web-verified entries across
+      geth (7), Nethermind (2), Besu (6), Erigon (4) — each checked
+      against official GitHub security advisories, release notes, or
+      the vendor postmortem, with references and range-bounding caveats
+      documented in `internal/nodeaudit/nodecves.yaml`
 
 ## Phase 4 — L3/L4 cross-chain and off-chain
 
