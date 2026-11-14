@@ -121,3 +121,64 @@
 - [ ] Move chains (Move Prover integration)
 - [ ] CosmWasm + Cosmos SDK state-machine fuzzing (Go)
 - [ ] Permissioned chains (Besu, Fabric)
+
+## Phase 7 — AI-readiness (in progress)
+
+AI orchestration lives OUTSIDE BlockTack: the companion project
+**RedHands** (MCP server for authorized security assessments) will wrap
+the BlockTack binary and supply the intelligence. BlockTack's job is to
+become a deterministic, machine-drivable engine — structured I/O,
+introspectable capabilities, zero interactive assumptions. AI-assisted
+planning stays out of BlockTack by design; RedHands owns the agentic
+layer while BlockTack owns execution + guardrails.
+
+- [ ] Integration spec (research agent analyzing RedHands' tool layer:
+      tool definition shapes, external-binary wrapping conventions,
+      chaining hand-offs, long-running tool handling, annotations for
+      guardrail mapping)
+- [ ] `--json` global output flag on all commands; structured errors
+      (JSON on stderr + stable exit codes)
+- [ ] `capabilities` introspection command: commands, engines, nodeaudit
+      modules, taxonomy summary, playbook step types — machine-readable
+- [ ] Campaign decomposition for async driving: start / status / results
+      (a campaign can run minutes — anvil forks, geth swarms)
+- [ ] `validate-target` dry command: target YAML + authorization-block
+      validation without execution
+- [ ] MCP tool annotations mapping: safe-mode/unsafe/authorization
+      surfaced as readOnlyHint/destructiveHint so AI clients cannot
+      accidentally request destructive operations
+
+## Phase 8 — Backlog (2025–2026 attack surface, agreed sequencing)
+
+Sequenced per signal-vs-risk discussion: 7702 + v4 hooks first (highest
+2025-2026 signal, lowest engineering risk given the revm work), then
+symbolic execution (the categorical differentiator).
+
+- [ ] EIP-7702 delegation abuse: revm already parses
+      `authorization_list`; replay real 7702 wallet-drainer sequences
+      on forks via `simulate-tx-sequence` — most current incident class
+- [ ] Uniswap v4 hooks: hook-simulation action (eth_call state
+      overrides + revm multi-tx) replaying real hook exploits;
+      per-hook attack surface on singleton pools
+- [ ] Symbolic execution on revm: extend `simulate-tx-sequence` from
+      replay to counterfactual exploration — path/constraint solving
+      over storage to find inputs hitting a profit condition (turns the
+      corpus from regression suite into discovery engine)
+- [ ] ERC-4337 bundler/paymaster simulation: policy griefing, gas-token
+      arbitrage in bundles, validateUserOp DoS
+- [ ] L1↔L2 cross-domain MEV replay on the two-chain fork harness
+      (same-block arb, sequencer timing, forced inclusion)
+- [ ] Restaking/AVS economic attacks (EigenLayer-style slashing
+      conditions, operator-set capture) — L5 deepening
+- [ ] Blob-era mechanics: 4844 blob txs in replays, EIP-7825/8037
+      behaviors, blob-pool mempool analysis
+- [ ] Intents/private-orderflow layer: solver-competition simulation,
+      settlement replays, malicious-solver backruns
+- [ ] Real-time shadow node: follower geth/erigon streaming live
+      mempool through mempool-analysis (read-only continuous
+      surveillance)
+- [ ] L3 bridge light-client checkers: replay domains, signature
+      malleability in verifiers, SNARK soundness assumptions
+      (Wormhole/Ronin class)
+- [ ] RIP-7212 passkey wallets (secp256r1): precompile/signature
+      malleability module for WebAuthn smart accounts
