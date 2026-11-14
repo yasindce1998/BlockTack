@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -113,6 +114,54 @@ func TestTargetAuthorizationGuardrails(t *testing.T) {
 	}, Endpoints: []Endpoint{{Name: "rpc", URL: "http://127.0.0.1:8545"}}}
 	if err := local.ValidateSafeMode(true); err != nil {
 		t.Errorf("local endpoint should pass safe mode: %v", err)
+	}
+}
+
+// TestGuardrailErrorCodes pins the typed guardrail refusals: machine
+// callers (CLI exit code 3, MCP wrappers) key on the stable Code field.
+func TestGuardrailErrorCodes(t *testing.T) {
+	noAuth := &Target{Name: "t1", Authorization: Authorization{Declared: false}}
+	var gr *GuardrailError
+	if err := noAuth.ValidateSafeMode(true); !errors.As(err, &gr) {
+		t.Fatalf("missing authorization must be a *GuardrailError, got %T: %v", err, err)
+	} else if gr.Code != "missing_authorization" {
+		t.Errorf("code = %q, want missing_authorization", gr.Code)
+	}
+
+	expired := &Target{Name: "t2", Authorization: Authorization{
+		Declared: true, Expires: mustTime("2020-01-01T00:00:00Z"),
+	}}
+	if err := expired.ValidateSafeMode(true); !errors.As(err, &gr) {
+		t.Fatalf("expired authorization must be a *GuardrailError, got %T", err)
+	} else if gr.Code != "expired_authorization" {
+		t.Errorf("code = %q, want expired_authorization", gr.Code)
+	}
+
+	noExpiry := &Target{Name: "t3", Authorization: Authorization{Declared: true}}
+	if err := noExpiry.ValidateSafeMode(true); !errors.As(err, &gr) {
+		t.Fatalf("missing expiry must be a *GuardrailError, got %T", err)
+	} else if gr.Code != "missing_expiry" {
+		t.Errorf("code = %q, want missing_expiry", gr.Code)
+	}
+
+	unsafe := &Target{Name: "t4", Authorization: Authorization{
+		Declared: true, Expires: mustTime("2099-01-01T00:00:00Z"),
+	}, Endpoints: []Endpoint{{Name: "rpc", URL: "http://example.com:8545"}}}
+	if err := unsafe.ValidateSafeMode(true); !errors.As(err, &gr) {
+		t.Fatalf("unsafe endpoint must be a *GuardrailError, got %T", err)
+	} else if gr.Code != "unsafe_endpoint" {
+		t.Errorf("code = %q, want unsafe_endpoint", gr.Code)
+	}
+	if gr.Target != "t4" {
+		t.Errorf("Target = %q, want t4", gr.Target)
+	}
+
+	// Non-guardrail errors must NOT be GuardrailError (exit 1, not 3).
+	bad := &Target{Name: "t5", Authorization: Authorization{
+		Declared: true, Expires: mustTime("2099-01-01T00:00:00Z"),
+	}, Endpoints: []Endpoint{{Name: "bad", URL: "ht tp://invalid url"}}}
+	if err := bad.ValidateSafeMode(true); err == nil || errors.As(err, &gr) {
+		t.Errorf("endpoint parse failure must be a plain error, got %v", err)
 	}
 }
 

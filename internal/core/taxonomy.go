@@ -11,28 +11,28 @@ import (
 // blockchain system and the weakness classes within it. It is the shared
 // vocabulary for findings, playbooks, and reports.
 type Taxonomy struct {
-	Version int        `yaml:"version"`
-	Layers  []TaxLayer `yaml:"layers"`
+	Version int        `yaml:"version" json:"version"`
+	Layers  []TaxLayer `yaml:"layers" json:"layers"`
 }
 
 // TaxLayer is one layer of the stack (L0..L5).
 type TaxLayer struct {
-	ID          string     `yaml:"id"`
-	Name        string     `yaml:"name"`
-	Description string     `yaml:"description"`
-	Weaknesses  []Weakness `yaml:"weaknesses"`
+	ID          string     `yaml:"id" json:"id"`
+	Name        string     `yaml:"name" json:"name"`
+	Description string     `yaml:"description" json:"description"`
+	Weaknesses  []Weakness `yaml:"weaknesses" json:"weaknesses"`
 }
 
 // Weakness is a vulnerability class within a layer, identified by a
 // stable ID of the form BTV-L<layer>-<nnn>.
 type Weakness struct {
-	ID          string   `yaml:"id"`
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
+	ID          string   `yaml:"id" json:"id"`
+	Name        string   `yaml:"name" json:"name"`
+	Description string   `yaml:"description" json:"description"`
 	// Remediation is concrete fix guidance rendered in engagement
 	// reports. It is advisory prose, not machine-actionable.
-	Remediation string   `yaml:"remediation"`
-	Tags        []string `yaml:"tags"`
+	Remediation string   `yaml:"remediation" json:"remediation"`
+	Tags        []string `yaml:"tags" json:"tags"`
 }
 
 // LoadTaxonomy reads the taxonomy YAML file.

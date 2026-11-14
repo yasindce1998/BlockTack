@@ -110,6 +110,21 @@ func (t *Target) WriteJSON(path string) error {
 	return enc.Encode(t)
 }
 
+// GuardrailError is a refusal raised by BlockTack's authorization and
+// safe-mode guardrails. It is typed so callers (CLI, MCP wrappers) can
+// distinguish refusals from ordinary failures: the CLI reserves exit
+// code 3 for guardrail refusals.
+type GuardrailError struct {
+	// Code is a stable machine-readable reason:
+	//   missing_authorization | missing_expiry | expired_authorization |
+	//   unsafe_endpoint
+	Code   string
+	Target string
+	Msg    string
+}
+
+func (e *GuardrailError) Error() string { return e.Msg }
+
 // ValidateSafeMode enforces BlockTack's guardrails:
 //
 //  1. Every target must carry an explicit, unexpired authorization block.
@@ -117,24 +132,38 @@ func (t *Target) WriteJSON(path string) error {
 //     listed in authorization.liveTargets.
 //
 // Pass safeMode=false only behind an explicit --unsafe flag.
+// Refusals are returned as *GuardrailError (stable Code field).
 func (t *Target) ValidateSafeMode(safeMode bool) error {
 	if !t.Authorization.Declared {
-		return fmt.Errorf(
-			"target %q has no authorization block: refusing to run. Add\n"+
-				"  authorization:\n"+
-				"    declared: true\n"+
-				"    authorizedBy: <who authorized this assessment>\n"+
-				"    scope: <what you are allowed to do>\n"+
-				"    expires: <RFC3339 timestamp>\n"+
-				"describing your authorization to test this system",
-			t.Name,
-		)
+		return &GuardrailError{
+			Code:   "missing_authorization",
+			Target: t.Name,
+			Msg: fmt.Sprintf(
+				"target %q has no authorization block: refusing to run. Add\n"+
+					"  authorization:\n"+
+					"    declared: true\n"+
+					"    authorizedBy: <who authorized this assessment>\n"+
+					"    scope: <what you are allowed to do>\n"+
+					"    expires: <RFC3339 timestamp>\n"+
+					"describing your authorization to test this system",
+				t.Name,
+			),
+		}
 	}
 	if t.Authorization.Expires.IsZero() {
-		return fmt.Errorf("target %q: authorization.expires is required", t.Name)
+		return &GuardrailError{
+			Code:   "missing_expiry",
+			Target: t.Name,
+			Msg:    fmt.Sprintf("target %q: authorization.expires is required", t.Name),
+		}
 	}
 	if time.Now().After(t.Authorization.Expires) {
-		return fmt.Errorf("target %q: authorization expired at %s", t.Name, t.Authorization.Expires.Format(time.RFC3339))
+		return &GuardrailError{
+			Code:   "expired_authorization",
+			Target: t.Name,
+			Msg: fmt.Sprintf("target %q: authorization expired at %s",
+				t.Name, t.Authorization.Expires.Format(time.RFC3339)),
+		}
 	}
 	if !safeMode {
 		return nil
@@ -154,11 +183,15 @@ func (t *Target) ValidateSafeMode(safeMode bool) error {
 		if slices.Contains(t.Authorization.LiveTargets, host) {
 			continue
 		}
-		return fmt.Errorf(
-			"safe mode: endpoint %s (%s) is neither local nor listed in authorization.liveTargets. "+
-				"Use a local/forked environment, add the host to authorization.liveTargets, or pass --unsafe if you are authorized",
-			ep.Name, host,
-		)
+		return &GuardrailError{
+			Code:   "unsafe_endpoint",
+			Target: t.Name,
+			Msg: fmt.Sprintf(
+				"safe mode: endpoint %s (%s) is neither local nor listed in authorization.liveTargets. "+
+					"Use a local/forked environment, add the host to authorization.liveTargets, or pass --unsafe if you are authorized",
+				ep.Name, host,
+			),
+		}
 	}
 	return nil
 }

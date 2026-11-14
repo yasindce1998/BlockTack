@@ -27,10 +27,24 @@ type Runner struct {
 	// Unsafe disables the safe-mode endpoint restriction (still requires
 	// a valid authorization block). Wire this to an explicit --unsafe flag.
 	Unsafe bool
+	// ProgressJSON emits machine-readable JSON-lines progress events to
+	// stdout (started/step_started/step_finished/killchain/finished).
+	// stdout is otherwise unused by campaigns; the human log stays on
+	// stderr. Consumers (e.g. MCP wrappers) tail this channel and the
+	// crash-resilient status.json written after every step.
+	ProgressJSON bool
 
-	logLines []string
-	findings []core.Finding
-	bgProcs  []*exec.Cmd
+	logLines  []string
+	findings  []core.Finding
+	bgProcs   []*exec.Cmd
+	stepsDone []stepOutcome
+	startedAt time.Time
+}
+
+// stepOutcome records one playbook step's result for status.json.
+type stepOutcome struct {
+	ID string `json:"id"`
+	OK bool   `json:"ok"`
 }
 
 // Run executes the campaign. Step failures are recorded and the campaign
@@ -47,20 +61,51 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
+	r.startedAt = time.Now().UTC()
 	r.logf("campaign %q against target %q started %s",
-		r.Playbook.Name, r.Target.Name, time.Now().UTC().Format(time.RFC3339))
+		r.Playbook.Name, r.Target.Name, r.startedAt.Format(time.RFC3339))
 	if r.Playbook.Description != "" {
 		r.logf("  %s", r.Playbook.Description)
 	}
+	r.emit(map[string]any{
+		"event":     "started",
+		"run_dir":   r.OutDir,
+		"target":    r.Target.Name,
+		"playbook":  r.Playbook.Name,
+		"steps":     len(r.Playbook.Steps),
+		"timestamp": r.startedAt.Format(time.RFC3339),
+	})
 
 	for _, step := range r.Playbook.Steps {
 		r.logf("step %-24s tactic=%s  %s", step.ID, step.Tactic, step.Name)
 		if step.Precondition != "" {
 			r.logf("  precondition: %s", step.Precondition)
 		}
-		if err := r.runStep(ctx, step, stepsDir); err != nil {
+		r.emit(map[string]any{
+			"event":    "step_started",
+			"id":       step.ID,
+			"tactic":   step.Tactic,
+			"name":     step.Name,
+			"step":     len(r.stepsDone) + 1,
+			"of_steps": len(r.Playbook.Steps),
+		})
+		before := len(r.findings)
+		err := r.runStep(ctx, step, stepsDir)
+		if err != nil {
 			r.logf("  FAILED: %v", err)
+		} else {
+			r.logf("  ok — %d findings", len(r.findings)-before)
 		}
+		r.stepsDone = append(r.stepsDone, stepOutcome{ID: step.ID, OK: err == nil})
+		r.emit(map[string]any{
+			"event":          "step_finished",
+			"id":             step.ID,
+			"ok":             err == nil,
+			"error":          errString(err),
+			"findings":       len(r.findings) - before,
+			"findings_total": len(r.findings),
+		})
+		r.writeStatus("running", step.ID)
 	}
 
 	r.stopBackground()
@@ -75,6 +120,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		if c.FinancialImpactEth != "" {
 			r.logf("  financial impact: %s ETH (%s wei)", c.FinancialImpactEth, c.FinancialImpactWei)
 		}
+		r.emit(map[string]any{
+			"event":                "killchain",
+			"id":                   c.ID,
+			"title":                c.Title,
+			"severity":             c.Severity,
+			"stages":               len(c.Stages),
+			"financial_impact_eth": c.FinancialImpactEth,
+		})
 		r.findings = append(r.findings, chainFinding(c))
 	}
 	if len(chains) > 0 {
@@ -89,23 +142,100 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	if err := core.SaveFindingsJSON(r.findings, filepath.Join(r.OutDir, "findings.json")); err != nil {
+		r.writeStatus("failed", "")
 		return err
 	}
 	f, err := os.Create(filepath.Join(r.OutDir, "findings.sarif"))
 	if err != nil {
+		r.writeStatus("failed", "")
 		return err
 	}
 	if err := core.WriteSARIF(f, r.findings); err != nil {
 		f.Close()
+		r.writeStatus("failed", "")
 		return err
 	}
 	if err := f.Close(); err != nil {
+		r.writeStatus("failed", "")
 		return err
 	}
-	return os.WriteFile(
+	if err := os.WriteFile(
 		filepath.Join(r.OutDir, "campaign.log"),
 		[]byte(strings.Join(r.logLines, "\n")+"\n"), 0o644,
-	)
+	); err != nil {
+		r.writeStatus("failed", "")
+		return err
+	}
+	r.emit(map[string]any{
+		"event":       "finished",
+		"findings":    len(r.findings),
+		"kill_chains": len(chains),
+		"exit":        "ok",
+		"run_dir":     r.OutDir,
+	})
+	r.writeStatus("completed", "")
+	return nil
+}
+
+// emit writes one JSON-lines progress event to stdout when ProgressJSON
+// is enabled. Best-effort: progress must never fail a campaign.
+func (r *Runner) emit(ev map[string]any) {
+	if !r.ProgressJSON {
+		return
+	}
+	data, err := json.Marshal(ev)
+	if err != nil {
+		return
+	}
+	fmt.Fprintln(os.Stdout, string(data))
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// writeStatus atomically rewrites <run_dir>/status.json after every
+// step, so a killed or crashed campaign still leaves machine-readable
+// state behind (findings.json is only written at the very end).
+func (r *Runner) writeStatus(state, currentStep string) {
+	st := statusSnapshot{
+		State:         state,
+		StartedAt:     r.startedAt.Format(time.RFC3339),
+		UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
+		Playbook:      r.Playbook.Name,
+		Target:        r.Target.Name,
+		CurrentStep:   currentStep,
+		StepsDone:     append([]stepOutcome(nil), r.stepsDone...),
+		StepsTotal:    len(r.Playbook.Steps),
+		FindingsSoFar: len(r.findings),
+	}
+	data, err := json.MarshalIndent(st, "", "  ")
+	if err != nil {
+		return
+	}
+	final := filepath.Join(r.OutDir, "status.json")
+	tmp := final + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, final)
+}
+
+// StatusSnapshot is the crash-resilient campaign state written to
+// status.json after each step.
+type statusSnapshot struct {
+	State         string        `json:"state"` // running | completed | failed
+	StartedAt     string        `json:"started_at"`
+	UpdatedAt     string        `json:"updated_at"`
+	Playbook      string        `json:"playbook"`
+	Target        string        `json:"target"`
+	CurrentStep   string        `json:"current_step,omitempty"`
+	StepsTotal    int           `json:"steps_total"`
+	StepsDone     []stepOutcome `json:"steps_done"`
+	FindingsSoFar int           `json:"findings_so_far"`
 }
 
 func (r *Runner) runStep(ctx context.Context, step Step, stepsDir string) error {
@@ -259,12 +389,12 @@ func chainFinding(c correlate.KillChain) core.Finding {
 		stages[i] = fmt.Sprintf("%s [%s]", s.Description, s.FindingID)
 	}
 	f := core.Finding{
-		ID:         c.ID,
-		Title:      c.Title,
-		Severity:   c.Severity,
-		Confidence: core.ConfConfirmed,
+		ID:          c.ID,
+		Title:       c.Title,
+		Severity:    c.Severity,
+		Confidence:  core.ConfConfirmed,
 		Description: c.Description + " Stages: " + strings.Join(stages, " -> ") + ".",
-		Source:     "correlate",
+		Source:      "correlate",
 	}
 	if c.FinancialImpactEth != "" {
 		f.Evidence = fmt.Sprintf("verified profit: %s ETH (%s wei)", c.FinancialImpactEth, c.FinancialImpactWei)

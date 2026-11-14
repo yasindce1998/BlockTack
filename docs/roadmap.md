@@ -132,21 +132,34 @@ introspectable capabilities, zero interactive assumptions. AI-assisted
 planning stays out of BlockTack by design; RedHands owns the agentic
 layer while BlockTack owns execution + guardrails.
 
-- [ ] Integration spec (research agent analyzing RedHands' tool layer:
+- [x] Integration spec (research agent analyzing RedHands' tool layer:
       tool definition shapes, external-binary wrapping conventions,
       chaining hand-offs, long-running tool handling, annotations for
-      guardrail mapping)
-- [ ] `--json` global output flag on all commands; structured errors
-      (JSON on stderr + stable exit codes)
-- [ ] `capabilities` introspection command: commands, engines, nodeaudit
-      modules, taxonomy summary, playbook step types — machine-readable
-- [ ] Campaign decomposition for async driving: start / status / results
-      (a campaign can run minutes — anvil forks, geth swarms)
-- [ ] `validate-target` dry command: target YAML + authorization-block
-      validation without execution
-- [ ] MCP tool annotations mapping: safe-mode/unsafe/authorization
-      surfaced as readOnlyHint/destructiveHint so AI clients cannot
-      accidentally request destructive operations
+      guardrail mapping) — preserved at `docs/redhands-integration.md`
+      with the full 11-tool table and risk register. Architecture
+      decision: **RedHands-side wrapper toolset** invoking `bin/blocktack`
+      (per-tool Go wrappers modeled on the aegis toolset), campaigns
+      driven via BackgroundManager start/status/results
+- [x] `--json` output: `matrix --json`, `--emit findings-json` on
+      recon/scan/node-audit (default sarif preserved byte-for-byte);
+      taxonomy structs gained JSON tags
+- [x] `capabilities` introspection command: commands, engines (probed on
+      disk), adapters, nodeaudit modules, taxonomy summary
+- [x] Campaign decomposition ready: `campaign --progress-json` emits
+      JSON-lines events (started/step_started/step_finished/killchain/
+      finished) on stdout, and a crash-resilient `status.json` is
+      atomically rewritten after every step — killed campaigns leave
+      machine-readable state behind
+- [x] `validate-target` dry command: target YAML + authorization-block
+      validation as a JSON verdict, zero endpoint contact
+- [x] Guardrail-to-caller mapping: refusals are typed
+      (`core.GuardrailError`, stable codes: missing_authorization,
+      missing_expiry, expired_authorization, unsafe_endpoint), the CLI
+      reserves **exit code 3** for them, and `BLOCKTACK_JSON_ERRORS=1`
+      emits structured error objects on stderr. `--unsafe` is never a
+      parameter in any of the new surfaces; safe-mode enforcement stays
+      in BlockTack code (`ValidateSafeMode`, double-checked by the
+      campaign runner)
 
 ## Phase 8 — Backlog (2025–2026 attack surface, agreed sequencing)
 
