@@ -16,8 +16,8 @@ p2p, oracles, off-chain infrastructure, and the economics that hold it together.
 [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-edition%202024-DEA584?logo=rust&logoColor=white)](https://rust-lang.org)
-[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-11-8b5cf6)](corpus/manifest.yaml)
-[![Historical incidents](https://img.shields.io/badge/historical%20incidents-3-fb7185)](corpus/manifest.yaml)
+[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-12-8b5cf6)](corpus/manifest.yaml)
+[![Historical incidents](https://img.shields.io/badge/historical%20incidents-4-fb7185)](corpus/manifest.yaml)
 
 <br/>
 
@@ -41,8 +41,8 @@ against real exploits:
 - **Attacks, not just findings** — eclipse a geth node with an attacker swarm,
   manipulate an oracle from deployed bytecode, drain a vault with a signed PoC
 - **History as the regression suite** — the attackers' own transactions from
-  Euler 2023, Curve/Vyper 2023, and KyberSwap 2023 replay on mainnet forks,
-  profits verified **to the wei**
+  Euler 2023, Curve/Vyper 2023, and KyberSwap 2023 (mainnet **and**
+  Arbitrum One) replay on mainnet forks, profits verified **to the wei**
 - **Zero-footprint simulation** — entire attack sequences execute in-memory
   (revm) against fork state: no broadcast, not even to a local chain
 - **Client-ready output** — kill chains with financial blast radius, and
@@ -161,11 +161,12 @@ bin/blocktack report --findings runs/campaigns/<run>/findings.json \
 |---|---|---|
 | Synthetic fixture classes | 2 | oracle manipulation, reentrancy |
 | Damn Vulnerable DeFi | 6 | naive-receiver · the-rewarder · free-rider · puppet-v2 · side-entrance · compromised |
-| **Historical incidents** | **3** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023** |
+| **Historical incidents** | **4** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023 (mainnet) · KyberSwap 2023 (Arbitrum One)** |
 
 *Euler: 15 transactions, ~$197M within 0.1%. Curve: 6,106.7513… WETH, exact to the
-wei. KyberSwap: 11 token balances exact. Every profit verified against the
-on-chain record, on forks, with zero mainnet traffic.*
+wei. KyberSwap mainnet: 11 token balances exact. KyberSwap Arbitrum: 12/12 txs
+identical hashes, 13/15 profit tokens exact to the raw unit. Every profit verified
+against the on-chain record, on forks, with zero live-chain traffic.*
 
 </div>
 
