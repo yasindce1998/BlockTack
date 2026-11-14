@@ -1,12 +1,23 @@
 # BlockTack node client vulnerability database.
 #
-# Seed database for the cve-check module: client version fingerprints
-# are matched against `vulnerabilities` and findings are emitted for
-# versions below `fixedIn`.
+# Client version fingerprints are matched against `vulnerabilities` and
+# findings are emitted for versions below `fixedIn`.
 #
-# IMPORTANT: entries here must be verified against upstream advisories
-# before being trusted in an engagement. This is a seed, not a complete
-# database — expand it from client release notes and security advisories.
+# Every entry below has been verified against an authoritative upstream
+# source (official GitHub security advisories, client release notes, or
+# the vendor postmortem — see each entry's `reference`). Entries with
+# range-bounded impact carry YAML comments: the schema has no
+# `introducedIn` lower bound yet, so fixedIn-only matching over-flags
+# nodes older than the introduction floor (tolerable: such nodes are
+# flagged by older entries anyway; an optional introducedIn field would
+# make these precise).
+#
+# Version-format notes for matching:
+#   - geth:      "Geth/v1.13.4-stable-.../linux-amd64/go1.21.7"
+#   - nethermind:"Nethermind/v1.25.3+<hash>"       (cut at '+')
+#   - besu:      "besu/v24.1.0/<os>-<arch>/<jvm>"  (calendar YY.M.patch —
+#                numeric component-wise compare, never lexical)
+#   - erigon:    "erigon/v2.60.0/<platform>"
 version: 1
 clients:
   - name: geth
@@ -18,12 +29,187 @@ clients:
           a malicious peer could crash or potentially execute code on
           the node
         fixedIn: "1.10.8"
-        reference: https://github.com/ethereum/go-ethereum/releases/tag/v1.10.8
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-9856-9gg9-qcmq
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2023-40591
+        summary: >-
+          The p2p handler spawned a goroutine per ping request; a peer
+          flooding ping requests could create unbounded goroutines and
+          crash the node via OOM (affects >= 1.10.0)
+        fixedIn: "1.12.1"
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-ppjg-v974-84cm
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2024-32972
+        summary: >-
+          Integer overflow handling an ETH-protocol GetBlockHeadersRequest
+          with count=0 lets a malicious peer drive unbounded memory
+          consumption and crash the node
+        fixedIn: "1.13.15"
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-4xc9-8hmq-j652
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2025-24883
+        summary: >-
+          The RLPx handshake did not validate that the remote EC public key
+          is a curve point; an all-zero public key crashes the node during
+          peer handshake (affects >= 1.14.0)
+        fixedIn: "1.14.13"
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-q26p-9cq4-7fc2
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2026-26314
+        summary: >-
+          A specially crafted p2p message forces a vulnerable node to
+          shut down or crash (fixed in both 1.16.9 and 1.17.0)
+        fixedIn: "1.16.9"
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-2gjw-fg97-vg3r
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2026-26313
+        summary: >-
+          An attacker causes high memory usage by sending a specially
+          crafted p2p message; fixed only on the 1.17 branch, so 1.16.x
+          nodes remain vulnerable
+        fixedIn: "1.17.0"
+        reference: https://github.com/ethereum/go-ethereum/security/advisories/GHSA-689v-6xwf-5jf3
+        layer: L1
+        weakness: BTV-L1-007
+      - id: 0xCERT-2026-0163
+        summary: >-
+          Security-focused release hardening DoS resistance in the eth and
+          snap p2p packet handlers and JUMPDEST analysis caching, and fixing
+          a node crash triggered by a rogue STUN server response
+        fixedIn: "1.17.8"
+        reference: https://github.com/ethereum/go-ethereum/releases/tag/v1.17.8
         layer: L1
         weakness: BTV-L1-007
   - name: nethermind
     match: "Nethermind/v"
-    vulnerabilities: []
+    vulnerabilities:
+      # Affects only 1.23.0 - 1.25.1 (bug introduced in v1.23.0); versions
+      # below 1.23.0 were NOT affected. fixedIn-only matching over-flags
+      # pre-1.23 nodes.
+      - id: NETH-6588
+        summary: >-
+          Consensus bug: an unhandled OverflowException while decoding a
+          revert message made Nethermind process a valid mainnet block as
+          invalid, halting block processing and attestation for affected
+          validators (affects 1.23.0 - 1.25.1)
+        fixedIn: "1.25.2"
+        reference: https://github.com/NethermindEth/nethermind/releases/tag/1.25.2
+        layer: L1
+        weakness: BTV-L1-007
+      - id: NETH-12588
+        summary: >-
+          Mandatory hardening release: ABI decoding allocation bounds are
+          now validated against malformed input, and undisposed array-pool
+          leaks in block processing and networking were fixed, closing
+          remote memory-exhaustion vectors
+        fixedIn: "1.39.3"
+        reference: https://github.com/NethermindEth/nethermind/releases/tag/1.39.3
+        layer: L1
+        weakness: BTV-L1-007
   - name: besu
     match: "besu/v"
-    vulnerabilities: []
+    vulnerabilities:
+      - id: GHSA-j2j5-x2rr-cv75
+        summary: >-
+          A devp2p peer can drive unbounded block-fetch work (memory and
+          threads) via repeated NEW_BLOCK_HASHES/NEW_BLOCK announcements
+          for the same block number
+        fixedIn: "26.7.1"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-j2j5-x2rr-cv75
+        layer: L1
+        weakness: BTV-L1-007
+      - id: GHSA-m2pj-j62h-7jwm
+        summary: >-
+          Per-transaction O(N^2) HashDoS: an attacker grinding colliding
+          keys could force quadratic work in EVM warm-access and EIP-1153
+          transient-storage tracking within a single transaction
+        fixedIn: "26.7.1"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-m2pj-j62h-7jwm
+        layer: L1
+        weakness: BTV-L1-007
+      - id: GHSA-xw6x-9526-6w9r
+        summary: >-
+          DiscV4 UDP discovery decodes all datagrams on one thread fed by
+          an unbounded queue; a single remote host sending datagrams faster
+          than they are decoded exhausts the JVM heap and kills the process
+        fixedIn: "26.8.0"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-xw6x-9526-6w9r
+        layer: L1
+        weakness: BTV-L1-007
+      - id: GHSA-xg9p-226c-vxvw
+        summary: >-
+          The Bonsai parallel transaction processor retains transaction
+          futures after a block is rejected, causing unbounded memory
+          growth until the node dies and does not recover
+        fixedIn: "26.8.0"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-xg9p-226c-vxvw
+        layer: L1
+        weakness: BTV-L1-007
+      - id: GHSA-8g2r-qvch-4c9j
+        summary: >-
+          The GraphQL blocks(from, to) query has no cap on range span or
+          clamp to chain head, so a single query pins a request-handling
+          thread in an effectively unbounded loop
+        fixedIn: "26.8.0"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-8g2r-qvch-4c9j
+        layer: L0
+        weakness: BTV-L0-008
+      - id: GHSA-p6f8-q9mp-7mj9
+        summary: >-
+          eth_newFilter and eth_subscribe (logs) accept unbounded address
+          lists matched linearly on the block-import thread; an
+          unauthenticated caller on the default-enabled ETH namespace can
+          stall block production
+        fixedIn: "26.8.1"
+        reference: https://github.com/besu-eth/besu/security/advisories/GHSA-p6f8-q9mp-7mj9
+        layer: L0
+        weakness: BTV-L0-008
+  - name: erigon
+    match: "erigon/v"
+    vulnerabilities:
+      # Affects only >= 3.1.0 and < 3.4.0; Erigon 2.x was NOT affected.
+      # fixedIn-only matching over-flags 2.x nodes.
+      - id: GHSA-4c6q-hpx8-75wm
+        summary: >-
+          Data race in the PeerDAS download request path (write to
+          cacheRequest under a read lock in cl/das) can cause undefined
+          behavior and node crashes under concurrent peer access
+        fixedIn: "3.4.0"
+        reference: https://github.com/erigontech/erigon/security/advisories/GHSA-4c6q-hpx8-75wm
+        layer: L1
+        weakness: BTV-L1-007
+      - id: CVE-2026-84304
+        summary: >-
+          Bundled grpc-go was vulnerable to heap-memory exhaustion by an
+          unauthenticated peer sending fragmented one-byte HTTP/2 DATA
+          frames across concurrent streams; fixed in Erigon by the grpc
+          v1.83.2 bump
+        fixedIn: "3.6.1"
+        reference: https://github.com/erigontech/erigon/releases/tag/v3.6.1
+        layer: L0
+        weakness: BTV-L0-008
+      - id: 0xCERT-2026-0258
+        summary: >-
+          Security release: network decoders now allocate as data arrives
+          and reject impossible compressed sizes, with tighter bounds on
+          peer queues, transaction packets and Caplin gossip control
+          messages, preventing memory exhaustion from hostile p2p traffic
+        fixedIn: "3.8.0"
+        reference: https://github.com/erigontech/erigon/releases/tag/v3.8.0
+        layer: L1
+        weakness: BTV-L1-007
+      - id: 0xCERT-2026-0269
+        summary: >-
+          Security release: Caplin enforces consensus-spec size limits on
+          gossip and peer responses, and fixes state-copy races and stale
+          cache reads that could compute wrong state roots and reject
+          valid blocks
+        fixedIn: "3.8.1"
+        reference: https://github.com/erigontech/erigon/releases/tag/v3.8.1
+        layer: L1
+        weakness: BTV-L1-007
