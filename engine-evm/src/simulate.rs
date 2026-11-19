@@ -14,7 +14,7 @@ use revm::context::{BlockEnv, TxEnv};
 use revm::database::AlloyDB;
 use revm::database_interface::async_db::DatabaseAsyncRef;
 use revm::database_interface::{DatabaseAsync, WrapDatabaseAsync};
-use revm::handler::{ExecuteEvm, MainBuilder, MainContext, MainnetEvm, MainnetContext};
+use revm::handler::{ExecuteEvm, MainBuilder, MainContext, MainnetContext, MainnetEvm};
 use revm::state::{AccountInfo, Bytecode};
 use revm::Context;
 
@@ -251,6 +251,13 @@ fn tx_env_from_envelope(tx: &TxEnvelope, signer: Address) -> TxEnv {
     env.data = Bytes::copy_from_slice(tx.input());
     env.nonce = tx.nonce();
     env.chain_id = tx.chain_id();
+    // EIP-7702: map the authorization list so EOA delegations are
+    // applied during execution. Without this a type-4 tx would decode
+    // but run with no delegations set (drainer replays would silently
+    // fail to move funds).
+    if let Some(tx7702) = tx.as_eip7702() {
+        env.set_signed_authorization(tx7702.tx().authorization_list.clone());
+    }
     env
 }
 
@@ -262,10 +269,7 @@ struct AlloyDbAsync(AlloyDB<alloy::network::Ethereum, DynProvider>);
 impl DatabaseAsync for AlloyDbAsync {
     type Error = revm::database::AlloyDBError;
 
-    async fn basic_async(
-        &mut self,
-        address: Address,
-    ) -> Result<Option<AccountInfo>, Self::Error> {
+    async fn basic_async(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         self.0.basic_async_ref(address).await
     }
 
@@ -276,15 +280,14 @@ impl DatabaseAsync for AlloyDbAsync {
         self.0.code_by_hash_async_ref(code_hash).await
     }
 
-    async fn storage_async(
-        &mut self,
-        address: Address,
-        index: U256,
-    ) -> Result<U256, Self::Error> {
+    async fn storage_async(&mut self, address: Address, index: U256) -> Result<U256, Self::Error> {
         self.0.storage_async_ref(address, index).await
     }
 
-    async fn block_hash_async(&mut self, number: u64) -> Result<alloy::primitives::B256, Self::Error> {
+    async fn block_hash_async(
+        &mut self,
+        number: u64,
+    ) -> Result<alloy::primitives::B256, Self::Error> {
         self.0.block_hash_async_ref(number).await
     }
 }
@@ -343,6 +346,42 @@ mod tests {
         assert_eq!(
             tx.to().unwrap(),
             "0x9420F8821aB4609Ad9FA514f8D2F5344C3c0A6Ab"
+                .parse::<Address>()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn decodes_type4_7702_tx_and_maps_authorization_list() {
+        // A real EIP-7702 transaction from Ethereum mainnet block
+        // 26448164: 0x40b49ade1f582cbad0ed0bf607eb491b41d68ab581f45fe2
+        // aafd852621c2c1b8 (keccak-verified against the hash). It
+        // carries one authorization delegating to 0x5ac4…adec4c and
+        // sweeps ~54.2 USDT — the drainer shape the 7702 replay
+        // support targets.
+        let raw = "0x04f903d10182418884017ce1478410941d358302e3c7945ac4c3f3d60d9186baf971aa1bda7c3924adec4c80b90304958ff8470000000000000000000000001369406e0f264955bfc887cd450e5b37997f15370000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000028016c33f0ccea7f3218b9bcaa88943388d114416cd336342530000000000000000000000000000000000000000000000000000000000000000000000006afecc2c00000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec7000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000044a9059cbb0000000000000000000000004a5f449fbb903d7890d1d0bb58cca12691320c98000000000000000000000000000000000000000000000000000000000338a00d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000041263035aa5bea7834c5dd22e5847ff2e06d80e886cd844595dbe8dcc086d8fc3365a8ea48b089e6b258f7d3811ac2cf0df768305d1619f1bf3b5c732048b815a31b00000000000000000000000000000000000000000000000000000000000000c0f85cf85a01945ac4c3f3d60d9186baf971aa1bda7c3924adec4c8001a03b28d14414f2b3f3908edc4c4c10754c1782bd331f0299107536ac930c83022aa07082528b06d8c81a3dd6180c98147f3a798a5078e2dbce5b55161522fb077bbc80a0a4b1d1d2f9e89f7ecacddd5e81470af603d081bd2359e672424b22ab84f82ceea01967f1bb9fbf996cc28bec6979aca4fee490d0d92cd6dc8de7a96be96840f0d8";
+        let bytes = alloy::hex::decode(raw.trim_start_matches("0x")).expect("hex");
+        let tx = TxEnvelope::decode(&mut bytes.as_slice()).expect("rlp decode");
+        // Type-4 (EIP-7702) envelope, signed by the drainer EOA.
+        assert_eq!(u8::from(tx.tx_type()), 0x04);
+        let signer = tx.recover_signer().expect("signer");
+        assert_eq!(
+            signer,
+            "0x18C03F4c45BB651072Ce54D2DB77D9d4a12C427A"
+                .parse::<Address>()
+                .unwrap()
+        );
+        // The authorization list must map into the execution
+        // environment: without it the EOA delegation is never applied
+        // and 7702 drainer replays silently no-op.
+        let env = tx_env_from_envelope(&tx, signer);
+        assert_eq!(env.tx_type, 0x04);
+        assert_eq!(env.authorization_list.len(), 1);
+        let auth = env.authorization_list.first().unwrap().clone();
+        let auth = auth.left().expect("signed authorization");
+        assert_eq!(
+            auth.address(),
+            &"0x5ac4c3f3d60d9186baf971aa1bda7c3924adec4c"
                 .parse::<Address>()
                 .unwrap()
         );
