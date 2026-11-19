@@ -16,8 +16,8 @@ p2p, oracles, off-chain infrastructure, and the economics that hold it together.
 [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-edition%202024-DEA584?logo=rust&logoColor=white)](https://rust-lang.org)
-[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-13-8b5cf6)](corpus/manifest.yaml)
-[![Historical incidents](https://img.shields.io/badge/historical%20incidents-5-fb7185)](corpus/manifest.yaml)
+[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-14-8b5cf6)](corpus/manifest.yaml)
+[![Historical incidents](https://img.shields.io/badge/historical%20incidents-6-fb7185)](corpus/manifest.yaml)
 
 <br/>
 
@@ -41,7 +41,7 @@ against real exploits:
 - **Attacks, not just findings** — eclipse a geth node with an attacker swarm,
   manipulate an oracle from deployed bytecode, drain a vault with a signed PoC
 - **History as the regression suite** — the attackers' own transactions from
-  Euler 2023, Curve/Vyper 2023, and KyberSwap 2023 (mainnet **and**
+  Euler 2023, Curve/Vyper 2023, KyberSwap 2023 (mainnet **and**
   Arbitrum One) replay on mainnet forks, profits verified **to the wei**
 - **Zero-footprint simulation** — entire attack sequences execute in-memory
   (revm) against fork state: no broadcast, not even to a local chain
@@ -161,15 +161,17 @@ bin/blocktack report --findings runs/campaigns/<run>/findings.json \
 |---|---|---|
 | Synthetic fixture classes | 2 | oracle manipulation, reentrancy |
 | Damn Vulnerable DeFi | 6 | naive-receiver · the-rewarder · free-rider · puppet-v2 · side-entrance · compromised |
-| **Historical incidents** | **5** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023 (mainnet) · KyberSwap 2023 (Arbitrum One) · EIP-7702 sven.eth 2026** |
+| **Historical incidents** | **6** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023 (mainnet + Arbitrum One) · EIP-7702 sven.eth 2026 · Cork v4-hook 2025** |
 
 *Euler: 15 transactions, ~$197M within 0.1%. Curve: 6,106.7513… WETH, exact to the
 wei. KyberSwap mainnet: 11 token balances exact. KyberSwap Arbitrum: 12/12 txs
 identical hashes, 13/15 profit tokens exact to the raw unit. EIP-7702 sven.eth:
 one sponsored type-4 transaction installs the delegation, claims rewards, and
-sweeps the full balance — the 2026 drainer class, replayed to the wei. Every
-profit verified against the on-chain record, on forks, with zero live-chain
-traffic.*
+sweeps the full balance. Cork: 36-tx attack window replayed with pinned
+timestamps — terminal state **wei-identical to mainnet**, gas byte-exact on all
+four critical transactions, plus the v4 hook-audit detection that would have
+flagged it pre-exploit. Every profit verified against the on-chain record, on
+forks, with zero live-chain traffic.*
 
 </div>
 
