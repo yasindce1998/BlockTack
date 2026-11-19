@@ -1,0 +1,176 @@
+# Historical incident replay: Cork Protocol Uniswap v4 hook exploit
+# (2025-05-28, ~$12M / 3,761.88 wstETH).
+#
+# Forks mainnet at block 22524865 and re-broadcasts the 36-transaction
+# attack window (attacker + Cork keeper + funder, block timestamps
+# pinned to their historical values — the attack straddles a market
+# expiry). Includes a hook-audit detection step against the vulnerable
+# CorkHook BEFORE the replay: the finding a defender could have acted
+# on. Zero transactions ever touch mainnet.
+#
+# Run from the repo root (requires foundry; expect a slow cold run —
+# the fork proxy caches archive state in
+# corpus/cork-v4hook-2025/rpc_cache/):
+#   bin/blocktack campaign \
+#     --target corpus/cork-v4hook-2025/target.yaml \
+#     --playbook playbooks/evm/cork-v4hook-incident-replay.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: cork-v4hook-incident-replay
+description: >
+  Replays the Cork Protocol exploit (BTV-L2-015, Uniswap v4 hook
+  access-control gap + rollover pricing edge case): 36 historical
+  transactions re-execute with pinned timestamps and byte-exact gas on
+  the four critical txs; the terminal state matches mainnet to the wei
+  (Exploiter C2: 3,761.877955 wstETH, ModuleCore: 34.474759 wstETH).
+  A hook-audit step first probes the vulnerable CorkHook on the
+  pre-exploit fork — the detection that would have flagged the missing
+  onlyPoolManager guard before the $12M drain.
+target:
+  chainTypes: [evm]
+  layers: [L2]
+steps:
+  - id: env-up-proxy
+    name: Start the pacing/caching fork proxy for May-2025 archive state
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          python3 corpus/cork-v4hook-2025/rpc_proxy.py 8561 \
+            "${FORK_UPSTREAM:-https://eth.drpc.org}"
+      background: true
+
+  - id: wait-for-proxy
+    name: Wait for the fork proxy to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://127.0.0.1:8561 && exit 0
+            sleep 1
+          done
+          echo "fork proxy did not come up" >&2
+          exit 1
+
+  - id: env-up
+    name: Fork mainnet at the pre-attack block (base fee pinned to the historical 1.94 gwei)
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          anvil --fork-url "${FORK_URL:-http://127.0.0.1:8561}" \
+            --fork-block-number 22524865 --port 8547 \
+            --block-base-fee-per-gas 1943245422
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the fork to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 180); do
+            cast block-number --rpc-url http://127.0.0.1:8547 >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "anvil fork did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the fork
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: modulecore-before
+    name: Record ModuleCore wstETH before the replay
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: erc20-balance
+      options:
+        token: "0x7f39C581F595B53c5CB19bD0b3f8dA6c935e2Ca0" # wstETH
+        accounts: ["0xccd90f6435dd78c4ecced1fa4db0d7242548a2a9"]
+
+  - id: detect-hook-gap
+    name: hook-audit the vulnerable CorkHook on the pre-exploit fork
+    tactic: discover
+    precondition: read-only eth_call probes of every enabled CorkHook callback — the detection that would have flagged the missing onlyPoolManager guard before the drain
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: hook-audit
+      options:
+        hook: "0x5287e8915445aee78e10190559d8dd21e0e9ea88" # CorkHook
+
+  - id: replay-attack-window
+    name: Re-broadcast the 36-tx attack window with pinned timestamps
+    tactic: exploit
+    precondition: fork block 22524865 — attacker at nonce 0, keeper at 146; each block pinned to its historical timestamp so the skew's 19-minutes-to-expiry parameters and the rollover's expiry gate hold
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - "python3 corpus/cork-v4hook-2025/replay.py http://127.0.0.1:8547"
+
+  - id: verify-replay-gate
+    name: Hard gate — terminal state matches mainnet to the wei
+    tactic: verify
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          python3 - <<'PYEOF'
+          import json, sys, urllib.request
+          RPC = "http://127.0.0.1:8547"
+          def rpc(method, params):
+              req = urllib.request.Request(RPC, data=json.dumps(
+                  {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode(),
+                  headers={"Content-Type": "application/json"})
+              return json.load(urllib.request.urlopen(req, timeout=120))["result"]
+          def wsteth(addr):
+              r = rpc("eth_call", [{"to": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+                                    "data": "0x70a08231" + "0"*24 + addr[2:]}, "latest"])
+              return int(r, 16)
+          gates = [
+              ("Exploiter C2 wstETH", "0x9af3dce0813fd7428c47f57a39da2f6dd7c9bb09",
+               3761877955369549831945),
+              ("ModuleCore wstETH", "0xccd90f6435dd78c4ecced1fa4db0d7242548a2a9",
+               34474759349606697572),
+          ]
+          fail = 0
+          for name, addr, want in gates:
+              got = wsteth(addr)
+              ok = got == want
+              print(f"  {'OK  ' if ok else 'FAIL'} {name}: {got} (mainnet {want}, delta {got - want})")
+              if not ok:
+                  fail = 1
+          sys.exit(fail)
+          PYEOF
+
+verification:
+  - id: transactions-executed
+    expects: all 36 vendored raw transactions mine; the 4 critical txs (LV rebalance, skew, rollover, exploit) with status=1 and gas byte-exact to mainnet; other-market keeper rebalances may revert harmlessly (nonces consumed)
+  - id: hook-gap-detected
+    expects: hook-audit findings on CorkHook — callbacks reachable without PoolManager access control (BTV-L2-015), the pre-exploit detection signal
+  - id: profit-materialized
+    expects: terminal state wei-identical to mainnet — Exploiter C2 holds exactly 3,761.877955369549831945 wstETH and ModuleCore exactly 34.474759349606697572 wstETH

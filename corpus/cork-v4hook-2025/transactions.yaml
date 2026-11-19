@@ -1,0 +1,40 @@
+# Ordered replay sequence for the Cork Protocol v4-hook exploit
+# (2025-05-28, ~$12M / 3,761.88 wstETH). 36 transactions from 3 EOAs —
+# the attacker, the Cork keeper/ops bot, and a Cork funding wallet —
+# interleaved in historical block order. The machine-readable ordered
+# list (blocks, pinned timestamps, nonces, roles) is manifest.json;
+# raw bytes live in transactions/NN_<hash>.raw (keccak-verified).
+apiVersion: blocktack/cork-v4hook-2025/v1
+forkBlock: 22524865 # block before the attacker's first tx: attacker nonce 0 (4.861046 ETH), keeper nonce 146, market intact ~7.9 days before expiry
+marketExpiry: 1748431824 # 2025-05-28 11:30:24 UTC — the rollover (keeper nonce 165) may only run at/after this timestamp
+actors:
+  attacker: "0xea6f30e360192bae715599e15e2f765b49e4da98" # 14 txs, nonces 0-13
+  keeper: "0x777777727073e72fbb3c81f9a8b88cc49feae2f5" # Cork ops bot, nonces 146-165 — includes the ModuleCore upgrade and the expiry rollover
+  funder: "0x028b671994abce5529722d1b18c404112289d17d" # funds the keeper with wstETH (2 transfers)
+  exploiterC1: "0x6e54115de254805365c2d9c8a2eeb9b52e54668f" # risk-premium/HIYA skew contract
+  exploiterC2: "0x9af3dce0813fd7428c47f57a39da2f6dd7c9bb09" # extraction contract — itself a Uniswap v4 hook
+  corkSafe: "0x8724f0884ffeF34A73084F026F317b903C6E9d06"
+contracts:
+  corkHook: "0x5287e8915445aee78e10190559d8dd21e0e9ea88" # the vulnerable v4 hook (BTV-L2-015)
+  flashSwapRouter: "0x55b90b37416dc0bd936045a8110d1af3b6bf0fc3"
+  moduleCore: "0xccd90f6435dd78c4ecced1fa4db0d7242548a2a9" # UUPS proxy; upgraded to 0xc30d089b… 3 days pre-exploit (replayed)
+  psmRouter: "0xf0da8927df8d759d5ba6d3d714b1452135d99cfc"
+  poolManager: "0x000000000004444c5dc75cb358380d2e3de08a90" # Uniswap v4 mainnet singleton
+tokens:
+  wstETH: "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0"
+  weETH8CT2: "0xcd25aa56aad1bcc1bb4b6b6b08bda53007ec81ce" # expiry-2 CT (literature address has a typo — this is chain-verified)
+  weETH8DS2: "0x7ea0614072e2107c834365bea14f9b6386fb84a5" # expiry-2 DS
+onchainRecord:
+  c2WstethAfterExploit: 3761877955369549831945 # 3,761.877955 wstETH — the attacker's proceeds
+  moduleCoreWstethAfterExploit: 34474759349606697572 # 34.474759 wstETH — the drained PSM
+  criticalGas:
+    lvRebalance: 477912    # keeper nonce 164
+    skew: 2225451          # attacker nonce 11
+    rollover: 4858959      # keeper nonce 165
+    exploit: 7946138       # attacker nonce 13
+documentedCheats:
+  - anvil_setBalance(keeper, 1 ETH) — fork-block balance (0.00126 ETH) cannot fund ~25M gas of keeper operations
+  - anvil_setNonce(funder, 99 / 107) before the two funding transfers — the funder made 11 unrelated txs in the window
+references:
+  - https://www.cork.tech/blog/post-mortem
+  - https://dedaub.com/blog/the-11m-cork-protocol-hack-a-critical-lesson-in-uniswap-v4-hook-security

@@ -175,9 +175,14 @@ symbolic execution (the categorical differentiator).
       balance sweep) — BTV-L2-014 added to the taxonomy; corpus entry
       corpus/eip7702-sveneth-2026/ (13th reproduced exploit, 5th
       historical incident)
-- [ ] Uniswap v4 hooks: hook-simulation action (eth_call state
-      overrides + revm multi-tx) replaying real hook exploits;
-      per-hook attack surface on singleton pools
+- [x] Uniswap v4 hooks: hook-audit engine action (permission-bit
+      decode + read-only callback probes + PoolManager differential —
+      PR #22, verified live against the Cork attacker's own hook) and
+      the Cork Protocol incident replayed exactly (36-tx attack window
+      with historical-timestamp pinning, terminal state wei-identical
+      to mainnet, gas byte-exact on all critical txs; BTV-L2-015;
+      corpus entry corpus/cork-v4hook-2025/) — 14th reproduced exploit,
+      6th historical incident
 - [ ] Symbolic execution on revm: extend `simulate-tx-sequence` from
       replay to counterfactual exploration — path/constraint solving
       over storage to find inputs hitting a profit condition (turns the

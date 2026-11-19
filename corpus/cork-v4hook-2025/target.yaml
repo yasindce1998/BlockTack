@@ -1,0 +1,44 @@
+# Cork Protocol v4-hook exploit target for the 2025-05-28 incident
+# replay. The playbook forks Ethereum mainnet at block 22524865 (the
+# block before the attacker's first setup tx: attacker EOA at nonce 0,
+# keeper at nonce 146, the wstETH:weETH market intact) on a local anvil
+# and re-broadcasts the 36 ordered historical transactions (attacker +
+# Cork keeper + funder interleaved, block timestamps pinned to their
+# historical values). Zero transactions ever touch mainnet; the archive
+# RPC is used read-only.
+#
+# NOTE ON THE FORK RPC: drpc serves the May-2025 archive state on its
+# free plan, but a cold replay pulls thousands of storage slots, so the
+# playbook routes anvil through the pacing/caching proxy
+# (rpc_proxy.py, port 8561). Historical raw transactions come from
+# publicnode (fetch-raw-txs.sh).
+apiVersion: blocktack/v1
+name: cork-v4hook-2025-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 1
+  fork:
+    enabled: true
+    base: https://eth.drpc.org
+    blockNumber: 22524865
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8547
+contracts:
+  - name: cork-hook
+    address: "0x5287e8915445aee78e10190559d8dd21e0e9ea88"
+  - name: flash-swap-router
+    address: "0x55b90b37416dc0bd936045a8110d1af3b6bf0fc3"
+  - name: module-core
+    address: "0xccd90f6435dd78c4ecced1fa4db0d7242548a2a9"
+components:
+  - name: wsteth-weeth-market
+    kind: defi
+    note: Cork depeg-insurance market (PSM + Liquidity Vault on a Uniswap v4 pool via CorkHook; BTV-L2-015 access-control gap + rollover pricing edge case)
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — read-only queries to public archive RPCs; transactions are broadcast only to the local fork
+  expires: "2027-12-31T00:00:00Z"

@@ -213,6 +213,30 @@ wargames:
       mechanics vs fork timestamps); gate thresholds account for it.
       See corpus/eip7702-sveneth-2026/.
 
+  - id: cork-v4hook-2025
+    title: Cork Protocol Uniswap v4 hook access-control exploit
+    year: 2025
+    layers: [L2]
+    weakness: BTV-L2-015
+    reference: https://www.cork.tech/blog/post-mortem
+    status: reproduced
+    notes: >-
+      The flagship Uniswap v4 hook incident (2025-05-28, ~$12M / 3,761.88
+      wstETH): CorkHook's beforeSwap lacked an onlyPoolManager guard,
+      letting the attacker's contract (itself a v4 hook) spoof the
+      callback flow with crafted hookData, chained with a rollover
+      pricing edge case that initialized the post-expiry AMM at a
+      skewed price. Replayed exactly on a mainnet fork (block 22524865)
+      with historical-timestamp pinning across the full 36-tx attack
+      window (attacker + Cork keeper + funder, including the ModuleCore
+      upgrade 3 days pre-exploit and the keeper's expiry rollover):
+      terminal state wei-identical to mainnet (Exploiter C2
+      3,761.877955 wstETH, ModuleCore 34.474759 wstETH) and gas
+      byte-exact on all four critical transactions. The playbook also
+      runs the hook-audit detection step against the vulnerable
+      CorkHook pre-exploit — BTV-L2-015 detected before replay.
+      See corpus/cork-v4hook-2025/.
+
   - id: dvd-the-rewarder
     title: Damn Vulnerable DeFi — The Rewarder
     layers: [L2]
