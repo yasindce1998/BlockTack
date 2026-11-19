@@ -12,6 +12,7 @@
 
 mod actions;
 mod finding;
+mod hooks;
 mod simulate;
 
 use finding::Finding;
@@ -195,6 +196,7 @@ async fn dispatch(job: Job) -> Vec<Finding> {
             .await
         }
         "simulate-call" => actions::simulate_call(&url, &job.options).await,
+        "hook-audit" => hooks::hook_audit(&url, &job.options).await,
         "oracle-staleness" => {
             let feeds: Vec<String> = job
                 .options
