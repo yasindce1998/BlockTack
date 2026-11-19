@@ -183,10 +183,19 @@ symbolic execution (the categorical differentiator).
       to mainnet, gas byte-exact on all critical txs; BTV-L2-015;
       corpus entry corpus/cork-v4hook-2025/) — 14th reproduced exploit,
       6th historical incident
-- [ ] Symbolic execution on revm: extend `simulate-tx-sequence` from
-      replay to counterfactual exploration — path/constraint solving
-      over storage to find inputs hitting a profit condition (turns the
-      corpus from regression suite into discovery engine)
+- [x] Symbolic execution: `symbolic-call` engine action — a symbolic
+      EVM interpreter (core opcode subset, byte-granular symbolic
+      memory, concrete storage from the fork RPC or a state overlay)
+      driving z3 over SMT-LIB2 for path exploration at every symbolic
+      JUMPI, with profit-condition goals (ethTo / tokenTransfer /
+      sstore) and model extraction as concrete attack calldata.
+      Validated by DISCOVERY: pointed at a locked vault fixture with
+      zero prior knowledge, the solver found the secret guess and the
+      maximal payout amount (engine-evm/testdata/LockedVault.sol).
+      Documented limits: symbolic keccak prunes paths, sub-calls are
+      concretized under the current model, unimplemented opcodes prune.
+      Next iterations: multi-tx exploration, symbolic storage, keccak
+      reasoning
 - [ ] ERC-4337 bundler/paymaster simulation: policy griefing, gas-token
       arbitrage in bundles, validateUserOp DoS
 - [ ] L1↔L2 cross-domain MEV replay on the two-chain fork harness

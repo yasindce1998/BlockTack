@@ -14,6 +14,7 @@ mod actions;
 mod finding;
 mod hooks;
 mod simulate;
+mod symbolic;
 
 use finding::Finding;
 use serde::Deserialize;
@@ -197,6 +198,7 @@ async fn dispatch(job: Job) -> Vec<Finding> {
         }
         "simulate-call" => actions::simulate_call(&url, &job.options).await,
         "hook-audit" => hooks::hook_audit(&url, &job.options).await,
+        "symbolic-call" => symbolic::symbolic_call(&url, &job.options).await,
         "oracle-staleness" => {
             let feeds: Vec<String> = job
                 .options
