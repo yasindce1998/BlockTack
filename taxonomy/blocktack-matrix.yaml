@@ -182,6 +182,11 @@ layers:
         description: phished authorization tuples delegate EOAs to attacker-controlled sweeper contracts, draining all assets in one sponsored transaction
         remediation: Render 7702 authorization prompts in plain language with the full delegate address and a known-good verification flag; monitor accounts for unexpected 0xef0100 delegation designators and alert on them; revoke delegations by replacing the code (self-delegation to 0x0 or the wallet's own delegate) and move remaining funds to a fresh address.
         tags: [evm, account-abstraction, phishing, wallet]
+      - id: BTV-L2-015
+        name: Uniswap v4 hook access-control gap
+        description: hook callbacks lack onlyPoolManager guards, letting arbitrary callers spoof PoolManager invocations with crafted parameters and hookData (the Cork Protocol 2025 class)
+        remediation: Guard every external hook callback with an onlyPoolManager check that runs before any parameter or hookData parsing; inherit the latest upstream BaseHook (which carries the guard) rather than forking old periphery; validate the PoolKey against an allow-list so the hook cannot be wired into attacker-created pools; never let routers or hooks hold standing token balances.
+        tags: [evm, uniswap-v4, hooks, access-control]
 
   - id: L3
     name: Cross-chain
