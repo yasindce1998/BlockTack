@@ -1,0 +1,32 @@
+# EIP-7702 sven.eth delegation-drain target for the 2026-10-14 incident
+# replay. The playbook forks Ethereum mainnet at block 26186934 (victim
+# still a plain EOA with 9.123657838802131 ETH and unclaimed PodMining
+# rewards; sponsor EOA at nonce 6) on a local anvil and re-broadcasts
+# the attacker's single signed type-4 transaction. Zero transactions
+# ever touch mainnet; the archive RPC is used read-only.
+apiVersion: blocktack/v1
+name: eip7702-sveneth-2026-fork
+chain:
+  type: evm
+  network: mainnet-fork
+  chainId: 1
+  fork:
+    enabled: true
+    base: https://eth.drpc.org
+    blockNumber: 26186934
+endpoints:
+  - name: local-anvil-fork
+    role: rpc
+    url: http://127.0.0.1:8546
+contracts:
+  - name: crimeenjoyor-sweeper
+    address: "0x0366b55f948a688888ca6e029ad0831f6ec260d1"
+components:
+  - name: sven.eth-victim-eoa
+    kind: wallet
+    note: victim EOA 0xd8ba9e5886b7000bace2c9dbdd0be98ac77d4a28 delegated to the sweeper via a phished EIP-7702 authorization (BTV-L2-014)
+authorization:
+  declared: true
+  authorizedBy: self (local lab)
+  scope: local forked environment only — read-only queries to public archive RPCs; transactions are broadcast only to the local fork
+  expires: "2027-12-31T00:00:00Z"

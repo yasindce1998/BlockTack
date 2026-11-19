@@ -167,9 +167,14 @@ Sequenced per signal-vs-risk discussion: 7702 + v4 hooks first (highest
 2025-2026 signal, lowest engineering risk given the revm work), then
 symbolic execution (the categorical differentiator).
 
-- [ ] EIP-7702 delegation abuse: revm already parses
-      `authorization_list`; replay real 7702 wallet-drainer sequences
-      on forks via `simulate-tx-sequence` — most current incident class
+- [x] EIP-7702 delegation abuse: revm authorization-list mapping in
+      simulate-tx-sequence (typed guardrail for silent no-op replays)
+      + the sven.eth / CrimeEnjoyor drain (2026-10-14, ~$22.7K) replayed
+      both in-memory (revm, critical profit finding) and on an anvil
+      fork (identical hash, delegation designator installed, full
+      balance sweep) — BTV-L2-014 added to the taxonomy; corpus entry
+      corpus/eip7702-sveneth-2026/ (13th reproduced exploit, 5th
+      historical incident)
 - [ ] Uniswap v4 hooks: hook-simulation action (eth_call state
       overrides + revm multi-tx) replaying real hook exploits;
       per-hook attack surface on singleton pools

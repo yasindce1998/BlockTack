@@ -16,8 +16,8 @@ p2p, oracles, off-chain infrastructure, and the economics that hold it together.
 [![License: MIT](https://img.shields.io/badge/license-MIT-22d3ee)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-edition%202024-DEA584?logo=rust&logoColor=white)](https://rust-lang.org)
-[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-12-8b5cf6)](corpus/manifest.yaml)
-[![Historical incidents](https://img.shields.io/badge/historical%20incidents-4-fb7185)](corpus/manifest.yaml)
+[![Exploits reproduced](https://img.shields.io/badge/exploits%20reproduced-13-8b5cf6)](corpus/manifest.yaml)
+[![Historical incidents](https://img.shields.io/badge/historical%20incidents-5-fb7185)](corpus/manifest.yaml)
 
 <br/>
 
@@ -36,7 +36,7 @@ replays *history* to prove their tooling actually works.
 **BlockTack is one campaign platform** that does all of it, and proves itself
 against real exploits:
 
-- **Full-stack taxonomy** — 52 weakness classes across six layers, from RPC
+- **Full-stack taxonomy** — 53 weakness classes across six layers, from RPC
   exposure to economic design, each with concrete remediation guidance
 - **Attacks, not just findings** — eclipse a geth node with an attacker swarm,
   manipulate an oracle from deployed bytecode, drain a vault with a signed PoC
@@ -85,7 +85,7 @@ synthetic, what is real-but-sandboxed, and what runs against live approved syste
 ## 🧭 The attack surface
 
 Every finding, playbook, and report is classified against a machine-readable
-taxonomy of 52 weakness classes across six layers (`bin/blocktack matrix`):
+taxonomy of 53 weakness classes across six layers (`bin/blocktack matrix`):
 
 | Layer | Scope | BlockTack capabilities |
 |---|---|---|
@@ -104,7 +104,7 @@ Requires [Go](https://go.dev) 1.27+, Rust, and [Foundry](https://getfoundry.sh).
 ```sh
 make build            # Go CLI + both Rust engines
 make test             # full test suite
-bin/blocktack matrix  # browse the 52-weakness taxonomy
+bin/blocktack matrix  # browse the 53-weakness taxonomy
 ```
 
 <details>
@@ -161,12 +161,15 @@ bin/blocktack report --findings runs/campaigns/<run>/findings.json \
 |---|---|---|
 | Synthetic fixture classes | 2 | oracle manipulation, reentrancy |
 | Damn Vulnerable DeFi | 6 | naive-receiver · the-rewarder · free-rider · puppet-v2 · side-entrance · compromised |
-| **Historical incidents** | **4** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023 (mainnet) · KyberSwap 2023 (Arbitrum One)** |
+| **Historical incidents** | **5** | **Euler 2023 (~$197M) · Curve/Vyper 2023 · KyberSwap 2023 (mainnet) · KyberSwap 2023 (Arbitrum One) · EIP-7702 sven.eth 2026** |
 
 *Euler: 15 transactions, ~$197M within 0.1%. Curve: 6,106.7513… WETH, exact to the
 wei. KyberSwap mainnet: 11 token balances exact. KyberSwap Arbitrum: 12/12 txs
-identical hashes, 13/15 profit tokens exact to the raw unit. Every profit verified
-against the on-chain record, on forks, with zero live-chain traffic.*
+identical hashes, 13/15 profit tokens exact to the raw unit. EIP-7702 sven.eth:
+one sponsored type-4 transaction installs the delegation, claims rewards, and
+sweeps the full balance — the 2026 drainer class, replayed to the wei. Every
+profit verified against the on-chain record, on forks, with zero live-chain
+traffic.*
 
 </div>
 
@@ -246,7 +249,7 @@ internal/webaudit/    off-chain web exposure checks
 adapters/             Python adapters (Slither, Foundry)
 engine-evm/           EVM engine (Rust: alloy + revm)
 engine-solana/        Solana engine (Rust)
-taxonomy/             52-weakness attack matrix (with remediation)
+taxonomy/             53-weakness attack matrix (with remediation)
 playbooks/            declarative attack campaigns (11 EVM + 1 Solana)
 corpus/               exploit regression corpus + vendored incidents
 examples/targets/     target definitions
