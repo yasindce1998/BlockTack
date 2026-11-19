@@ -23,7 +23,11 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn new(id: impl Into<String>, title: impl Into<String>, severity: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        severity: impl Into<String>,
+    ) -> Self {
         Finding {
             id: id.into(),
             title: title.into(),

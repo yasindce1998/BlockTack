@@ -1,0 +1,42 @@
+# Ordered attacker transaction for the EIP-7702 sven.eth delegation-drain
+# replay — the 2026-10-14 single-transaction wallet drain (~$22.7K) from
+# the October 2026 CrimeEnjoyor drainer wave. The provenance script
+# (fetch-raw-txs.sh) re-derives the raw tx and keccak-verifies it.
+apiVersion: blocktack/eip7702-sveneth-2026/v1
+forkBlock: 26186934 # 2026-10-14, the block before the attack: victim is a plain EOA (empty code), 9.123657838802131 ETH, unclaimed PodMining rewards
+attackBlock: 26186935
+actors:
+  victim: "0xd8ba9e5886b7000bace2c9dbdd0be98ac77d4a28" # sven.eth (ENS); plain EOA at the fork block
+  delegate: "0x0366b55f948a688888ca6e029ad0831f6ec260d1" # CrimeEnjoyor sweeper bytecode the victim's authorization delegates to
+  sponsor: "0x9208097c007be15e28b20e94e66870a3f9f820bc" # attacker EOA that pays gas and submits the type-4 tx (nonce 6 at fork)
+  collector: "0x9208097c007be15e28b20e94e66870a3f9f820bc" # swept ETH and TAPEETH land on the sponsor itself
+tokens:
+  tapeeth: "0xace2e0179501a2bfad5f0fb230f38c87597d5e1b" # 8 decimals
+contracts:
+  podMining: "0xaa85f31c600c001eaa469118b47f147cf4b35d13" # reward source the sweeper claims from (not itself vulnerable)
+transactions:
+  - order: 0
+    hash: "0x36e0d1491c14e3d8e50bc70d73675b89d2d4712814d16f808f957c84fde820ee"
+    block: 26186935
+    type: 4
+    description: >-
+      Sponsored type-4 (EIP-7702) transaction carrying the victim's
+      authorization (auth nonce 7442) delegating sven.eth to the
+      CrimeEnjoyor sweeper. In one transaction: install the delegation,
+      call PodMining.claim() minting 1.69271471 TAPEETH to the victim,
+      transfer the TAPEETH to the sponsor, and sweep the victim's entire
+      9.123657838802131 ETH balance.
+onchainRecord: # read from Ethereum mainnet via archive RPC (drpc)
+  victimEthBefore: 9123657838802131494
+  victimEthAfter: 0
+  sponsorEthDelta: 9123097566532401097 # ~9.1231 ETH net of the gas the sponsor paid — matches ExVul's reported figure
+  sponsorTapeethAfter: 169271471 # 1.69271471 TAPEETH (fork single-actor replay observes 169268788 — see README divergences)
+  victimCodeAfter: "0xef01000366b55f948a688888ca6e029ad0831f6ec260d1"
+context:
+  - "2026-10-10: a staking user lost ~$1.54M via the same sweeper bytecode (Scam Sniffer / SlowMist alerts)"
+  - "2026-10-14: this incident — sven.eth drained for 9.1231 ETH net + 1.69271471 TAPEETH (ExVul alert)"
+  - "The malicious delegation remained active at block 26188153 per ExVul, leaving the address exposed to repeat drains"
+  - "Campaign scale (Wintermute): one operation spent 2.88 ETH to authorize malicious delegations across ~79,000 addresses"
+references:
+  - https://x.com/exvulsec/status/2110227539696456075
+  - https://www.cryptotimes.io/2026/10/14/ethereum-wallet-loses-22-7k-in-eip-7702-delegation-attack

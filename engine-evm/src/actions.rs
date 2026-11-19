@@ -38,27 +38,23 @@ pub async fn fingerprint(provider: DynProvider) -> anyhow::Result<Vec<Finding>> 
         .await
         .unwrap_or_else(|e| format!("unavailable: {e}"));
 
-    Ok(vec![
-        Finding::new(
-            "engine-evm-fingerprint",
-            "Chain fingerprinted",
-            "info",
-        )
-        .with("confidence", "confirmed")
-        .with("layer", "L1")
-        .with("weakness", "BTV-L1-001")
-        .with(
-            "description",
-            "Chain identity established via JSON-RPC. Cross-reference the client version \
+    Ok(vec![Finding::new(
+        "engine-evm-fingerprint",
+        "Chain fingerprinted",
+        "info",
+    )
+    .with("confidence", "confirmed")
+    .with("layer", "L1")
+    .with("weakness", "BTV-L1-001")
+    .with(
+        "description",
+        "Chain identity established via JSON-RPC. Cross-reference the client version \
              with known client CVEs before attacking protocol handlers.",
-        )
-        .with(
-            "evidence",
-            format!(
-                "chainId={chain_id} blockNumber={block_number} clientVersion={client_version}"
-            ),
-        ),
-    ])
+    )
+    .with(
+        "evidence",
+        format!("chainId={chain_id} blockNumber={block_number} clientVersion={client_version}"),
+    )])
 }
 
 /// Oracle-related function signatures whose selectors we scan bytecode for.
@@ -66,12 +62,18 @@ pub async fn fingerprint(provider: DynProvider) -> anyhow::Result<Vec<Finding>> 
 /// oracle read — both are leads for BTV-L2-003.
 const ORACLE_SIGNATURES: &[(&str, &str)] = &[
     ("latestAnswer()", "Chainlink-style aggregator (legacy)"),
-    ("latestRoundData()", "Chainlink-style aggregator (round data)"),
+    (
+        "latestRoundData()",
+        "Chainlink-style aggregator (round data)",
+    ),
     (
         "getRoundData(uint80)",
         "Chainlink-style aggregator (historical rounds)",
     ),
-    ("getReserves()", "AMM reserve read — Uniswap V2-style spot price"),
+    (
+        "getReserves()",
+        "AMM reserve read — Uniswap V2-style spot price",
+    ),
     (
         "price0CumulativeLast()",
         "Uniswap V2 cumulative price accumulator",
@@ -81,7 +83,10 @@ const ORACLE_SIGNATURES: &[(&str, &str)] = &[
         "Uniswap V2 cumulative price accumulator",
     ),
     ("slot0()", "Uniswap V3 slot0 spot price"),
-    ("consult(address,uint256)", "Uniswap V2 oracle library consult"),
+    (
+        "consult(address,uint256)",
+        "Uniswap V2 oracle library consult",
+    ),
     ("peek()", "Maker-style oracle peek"),
     ("read()", "Maker-style oracle read"),
 ];
@@ -96,7 +101,10 @@ fn selector(signature: &str) -> [u8; 4] {
 fn scan_code(code: &[u8]) -> Vec<(&'static str, &'static str)> {
     ORACLE_SIGNATURES
         .iter()
-        .filter(|(sig, _)| code.windows(4).any(|window| window == selector(sig).as_slice()))
+        .filter(|(sig, _)| {
+            code.windows(4)
+                .any(|window| window == selector(sig).as_slice())
+        })
         .map(|(sig, description)| (*sig, *description))
         .collect()
 }
@@ -152,7 +160,10 @@ pub async fn map_oracles(
                     "No oracle-related function selectors found; extend ORACLE_SIGNATURES \
                      if the target uses a non-standard feed.",
                 )
-                .with("evidence", format!("address={address} code_size={}", code.len())),
+                .with(
+                    "evidence",
+                    format!("address={address} code_size={}", code.len()),
+                ),
             );
         } else {
             for (signature, description) in hits {
@@ -178,7 +189,10 @@ pub async fn map_oracles(
                         "evidence",
                         format!(
                             "address={address} selector=0x{:02x}{:02x}{:02x}{:02x} code_size={}",
-                            sel[0], sel[1], sel[2], sel[3],
+                            sel[0],
+                            sel[1],
+                            sel[2],
+                            sel[3],
                             code.len()
                         ),
                     ),
@@ -214,28 +228,32 @@ pub async fn verify_pnl(
     );
 
     if balance_now > balance_past {
-        Ok(vec![
-            Finding::new("engine-evm-verify-pnl", "Exploit profit verified", "critical")
-                .with("confidence", "confirmed")
-                .with("layer", "L5")
-                .with(
-                    "description",
-                    "The tracked address gained balance over the exploit window; the campaign's \
+        Ok(vec![Finding::new(
+            "engine-evm-verify-pnl",
+            "Exploit profit verified",
+            "critical",
+        )
+        .with("confidence", "confirmed")
+        .with("layer", "L5")
+        .with(
+            "description",
+            "The tracked address gained balance over the exploit window; the campaign's \
                      economic objective was achieved on this chain.",
-                )
-                .with("evidence", evidence),
-        ])
+        )
+        .with("evidence", evidence)])
     } else {
-        Ok(vec![
-            Finding::new("engine-evm-verify-pnl", "No profit detected", "info")
-                .with("confidence", "confirmed")
-                .with("layer", "L5")
-                .with(
-                    "description",
-                    "The tracked address did not gain balance over the window (net of gas).",
-                )
-                .with("evidence", evidence),
-        ])
+        Ok(vec![Finding::new(
+            "engine-evm-verify-pnl",
+            "No profit detected",
+            "info",
+        )
+        .with("confidence", "confirmed")
+        .with("layer", "L5")
+        .with(
+            "description",
+            "The tracked address did not gain balance over the window (net of gas).",
+        )
+        .with("evidence", evidence)])
     }
 }
 
@@ -329,8 +347,9 @@ pub async fn simulate_call(
                 .ok_or_else(|| anyhow::anyhow!("state slots must be an object"))?
             {
                 let slot = B256::new(U256::from(parse_u256(slot_raw)?).to_be_bytes());
-                let value =
-                    B256::new(U256::from(parse_u256(value_raw.as_str().unwrap_or_default())?).to_be_bytes());
+                let value = B256::new(
+                    U256::from(parse_u256(value_raw.as_str().unwrap_or_default())?).to_be_bytes(),
+                );
                 state.insert(slot, value);
             }
             account.state = Some(state);
@@ -343,43 +362,42 @@ pub async fn simulate_call(
 
     let calldata_hex = format!("0x{}", hex(&calldata));
     match result {
-        Ok(bytes) => Ok(vec![
-            Finding::new(
-                "engine-evm-simulate-call",
-                format!("Call succeeds in simulation: {signature}"),
-                "medium",
-            )
-            .with("confidence", "confirmed")
-            .with("layer", "L2")
-            .with(
-                "description",
-                format!(
-                    "eth_call with storage overrides returned successfully. The call path \
+        Ok(bytes) => Ok(vec![Finding::new(
+            "engine-evm-simulate-call",
+            format!("Call succeeds in simulation: {signature}"),
+            "medium",
+        )
+        .with("confidence", "confirmed")
+        .with("layer", "L2")
+        .with(
+            "description",
+            format!(
+                "eth_call with storage overrides returned successfully. The call path \
                      works under the hypothesized state — the attack premise is confirmed \
                      by simulation, no transaction was broadcast."
-                ),
-            )
-            .with(
-                "evidence",
-                format!("to={to} calldata={calldata_hex} result=0x{}", hex(&bytes)),
             ),
-        ]),
-        Err(e) => Ok(vec![
-            Finding::new(
-                "engine-evm-simulate-call",
-                format!("Call reverts in simulation: {signature}"),
-                "info",
-            )
-            .with("confidence", "confirmed")
-            .with("layer", "L2")
-            .with(
-                "description",
-                "eth_call with storage overrides reverted — the hypothesized state does \
+        )
+        .with(
+            "evidence",
+            format!("to={to} calldata={calldata_hex} result=0x{}", hex(&bytes)),
+        )]),
+        Err(e) => Ok(vec![Finding::new(
+            "engine-evm-simulate-call",
+            format!("Call reverts in simulation: {signature}"),
+            "info",
+        )
+        .with("confidence", "confirmed")
+        .with("layer", "L2")
+        .with(
+            "description",
+            "eth_call with storage overrides reverted — the hypothesized state does \
                  not make this call path viable (or the call itself is not callable via \
                  eth_call).",
-            )
-            .with("evidence", format!("to={to} calldata={calldata_hex} error={e}")),
-        ]),
+        )
+        .with(
+            "evidence",
+            format!("to={to} calldata={calldata_hex} error={e}"),
+        )]),
     }
 }
 
@@ -445,22 +463,25 @@ pub async fn oracle_staleness(
         // answeredInRound) — 5 x 32-byte words.
         let answer = U256::from_be_bytes::<32>(res[32..64].try_into().unwrap());
         let updated_at = U256::from_be_bytes::<32>(res[96..128].try_into().unwrap());
-        let evidence = format!(
-            "feed={raw} answer={answer} updatedAt={updated_at} blockTimestamp={block_ts}"
-        );
+        let evidence =
+            format!("feed={raw} answer={answer} updatedAt={updated_at} blockTimestamp={block_ts}");
 
         if answer.is_zero() {
             findings.push(
-                Finding::new("engine-evm-oracle-staleness", "Oracle feed reporting zero", "critical")
-                    .with("confidence", "confirmed")
-                    .with("layer", "L4")
-                    .with("weakness", "BTV-L4-001")
-                    .with(
-                        "description",
-                        "The aggregator's latest answer is zero — consuming protocols will \
+                Finding::new(
+                    "engine-evm-oracle-staleness",
+                    "Oracle feed reporting zero",
+                    "critical",
+                )
+                .with("confidence", "confirmed")
+                .with("layer", "L4")
+                .with("weakness", "BTV-L4-001")
+                .with(
+                    "description",
+                    "The aggregator's latest answer is zero — consuming protocols will \
                          misprice assets or break outright (the classic broken-feed incident).",
-                    )
-                    .with("evidence", evidence),
+                )
+                .with("evidence", evidence),
             );
             continue;
         }

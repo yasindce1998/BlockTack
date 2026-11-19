@@ -192,6 +192,27 @@ wargames:
     status: reproduced
     notes: two of three oracle sources' keys leaked (encoded in challenge docs); median price crashed to buy an NFT for 1 wei, then pumped to drain the exchange for 999 ETH
 
+  - id: eip7702-sveneth-2026
+    title: EIP-7702 malicious delegation wallet drain (sven.eth / CrimeEnjoyor wave)
+    year: 2026
+    layers: [L2]
+    weakness: BTV-L2-014
+    reference: https://x.com/exvulsec/status/2110227539696456075
+    status: reproduced
+    notes: >-
+      First EIP-7702 incident in the corpus (2026-10-14): the attacker
+      sponsored a single type-4 transaction carrying the victim's
+      phished authorization, delegating sven.eth to the CrimeEnjoyor
+      sweeper — one transaction installed the delegation, claimed
+      1.69271471 TAPEETH from PodMining, forwarded it, and swept the
+      victim's entire 9.123657838802131 ETH. Replayed on a mainnet fork
+      (block 26186934): identical hash and status, delegation
+      designator installed, full sweep verified. The delegation stays
+      active after the theft — the durable exposure ExVul flagged.
+      TAPEETH balances drift ~0.006% run-to-run (rebase-like token
+      mechanics vs fork timestamps); gate thresholds account for it.
+      See corpus/eip7702-sveneth-2026/.
+
   - id: dvd-the-rewarder
     title: Damn Vulnerable DeFi — The Rewarder
     layers: [L2]

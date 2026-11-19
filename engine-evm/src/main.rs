@@ -102,32 +102,39 @@ async fn dispatch(job: Job) -> Vec<Finding> {
     let url = match rpc_url(&job) {
         Ok(url) => url.to_string(),
         Err(e) => {
-            return vec![Finding::new(
-                "engine-evm-no-rpc",
-                "No RPC endpoint in target",
-                "medium",
-            )
-            .with("description", e.to_string())]
+            return vec![
+                Finding::new("engine-evm-no-rpc", "No RPC endpoint in target", "medium")
+                    .with("description", e.to_string()),
+            ]
         }
     };
 
     let result: anyhow::Result<Vec<Finding>> = match action {
-        "fingerprint" => async {
-            let provider = actions::connect(&url).await?;
-            actions::fingerprint(provider).await
+        "fingerprint" => {
+            async {
+                let provider = actions::connect(&url).await?;
+                actions::fingerprint(provider).await
+            }
+            .await
         }
-        .await,
-        "map-oracles" => async {
-            let provider = actions::connect(&url).await?;
-            actions::map_oracles(provider, &collect_addresses(&job)).await
+        "map-oracles" => {
+            async {
+                let provider = actions::connect(&url).await?;
+                actions::map_oracles(provider, &collect_addresses(&job)).await
+            }
+            .await
         }
-        .await,
         "simulate-tx-sequence" => {
             let raw_files: Vec<String> = job
                 .options
                 .get("rawFiles")
                 .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
                 .unwrap_or_default();
             let mut reports = Vec::new();
             if let Some(list) = job.options.get("reports").and_then(Value::as_array) {
@@ -136,7 +143,9 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                         Some(a) => a,
                         None => continue,
                     };
-                    let Ok(account) = account.parse() else { continue };
+                    let Ok(account) = account.parse() else {
+                        continue;
+                    };
                     let token = r
                         .get("token")
                         .and_then(Value::as_str)
@@ -145,13 +154,18 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                         .get("minProfit")
                         .and_then(Value::as_str)
                         .and_then(|m| actions::parse_u256(m).ok());
-                    reports.push(simulate::Report { token, account, min_profit });
+                    reports.push(simulate::Report {
+                        token,
+                        account,
+                        min_profit,
+                    });
                 }
             }
             // Runs on a dedicated thread with its own runtime; blocks here.
             simulate::simulate_tx_sequence(&url, &raw_files, &reports)
         }
-        "erc20-balance" => {            let token = job
+        "erc20-balance" => {
+            let token = job
                 .options
                 .get("token")
                 .and_then(Value::as_str)
@@ -160,7 +174,12 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .options
                 .get("accounts")
                 .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
                 .unwrap_or_default();
             let min_profit = job
                 .options
@@ -168,8 +187,8 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .and_then(Value::as_str)
                 .map(actions::parse_u256);
             async {
-                let token = token
-                    .ok_or_else(|| anyhow::anyhow!("erc20-balance requires options.token"))?;
+                let token =
+                    token.ok_or_else(|| anyhow::anyhow!("erc20-balance requires options.token"))?;
                 let min_profit = min_profit.transpose()?;
                 actions::erc20_balance(&url, &token, &accounts, min_profit).await
             }
@@ -181,7 +200,12 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .options
                 .get("feeds")
                 .and_then(Value::as_array)
-                .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
                 .unwrap_or_else(|| {
                     job.target
                         .contracts
@@ -194,10 +218,7 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                 .get("maxStalenessSeconds")
                 .and_then(Value::as_u64)
                 .unwrap_or(3600);
-            async {
-                actions::oracle_staleness(&url, &feeds, max_staleness).await
-            }
-            .await
+            async { actions::oracle_staleness(&url, &feeds, max_staleness).await }.await
         }
         "verify-pnl" => match job.options.get("attacker").and_then(Value::as_str) {
             Some(attacker) => {
@@ -206,10 +227,7 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                     .get("blocksAgo")
                     .and_then(Value::as_u64)
                     .unwrap_or(2);
-                async {
-                    actions::verify_pnl(&url, attacker, blocks_ago).await
-                }
-                .await
+                async { actions::verify_pnl(&url, attacker, blocks_ago).await }.await
             }
             None => Ok(vec![Finding::new(
                 "engine-evm-verify-pnl",
@@ -222,10 +240,7 @@ async fn dispatch(job: Job) -> Vec<Finding> {
                  {attacker: \"0x..\", blocksAgo: N}",
             )]),
         },
-        other => Ok(vec![stub_finding(
-            other,
-            "Unknown action requested.",
-        )]),
+        other => Ok(vec![stub_finding(other, "Unknown action requested.")]),
     };
 
     result.unwrap_or_else(|e| {

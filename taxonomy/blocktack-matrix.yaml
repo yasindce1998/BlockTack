@@ -11,7 +11,7 @@
 #   L3 Cross-chain           — bridges, relayers, light clients
 #   L4 Off-chain             — oracles, indexers, frontends, custodians
 #   L5 Economic & Governance — incentive design, governance, MEV
-version: 1
+version: 2
 layers:
   - id: L0
     name: Infrastructure
@@ -177,6 +177,11 @@ layers:
         description: upgradeable proxies left uninitialized allow ownership capture
         remediation: Initialize logic contracts in the same deployment script that deploys the proxy, and verify on-chain that every implementation is initialized and owned before funding interactions.
         tags: [evm, proxy, access-control]
+      - id: BTV-L2-014
+        name: EIP-7702 malicious delegation
+        description: phished authorization tuples delegate EOAs to attacker-controlled sweeper contracts, draining all assets in one sponsored transaction
+        remediation: Render 7702 authorization prompts in plain language with the full delegate address and a known-good verification flag; monitor accounts for unexpected 0xef0100 delegation designators and alert on them; revoke delegations by replacing the code (self-delegation to 0x0 or the wallet's own delegate) and move remaining funds to a fresh address.
+        tags: [evm, account-abstraction, phishing, wallet]
 
   - id: L3
     name: Cross-chain
